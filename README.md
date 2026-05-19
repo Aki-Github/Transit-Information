@@ -1,3 +1,39 @@
+# 首都圏運行情報アプリ
+
+Chakra UI v3 と React (TypeScript) を使用して構築した、シンプルでモダンなユーザー管理フロントエンドアプリケーションです。
+
+## 🚀 デモ (オプション)
+- 公開URL: [ここにURL]
+
+## ✨ 主な機能
+- **首都圏鉄道 運行情報**: 外部API（公共交通オープンデータセンターODPT）から取得した運行情報をカード形式で綺麗に整列・レスポンシブ表示
+- **バス停マップ**: 首都圏の駅名や地名を検索して、周辺のバス停を国土地理院の地図上にピンで配置
+- **トースト通知**: ログインなどのアクション成否を右上にトーストメッセージでユーザーへ通知
+
+## 🛠 使用技術
+- **Frontend**: React (TypeScript), Create React App
+- **UI Library**: Chakra UI v3 (最新のコンポーネントシステムに対応)
+- **State Management / Hooks**: React Hooks (`useEffect`, `useCallback` による最適化)
+
+## 💡 こだわった点・学んだこと
+- **Chakra UI v3 への対応**: 
+  旧バージョン（v2）の `useToast` や `WrapItem`、`FormControl` から、v3 の新しい `toaster`、`Dialog`、`Field` システムへとコードを現代的にリファクタリングし、最新のコンポーネント設計を学びました。
+- **UI/UX の調整**: 
+  モーダルの表示位置を画面上部に固定するカスタムスタイルを適用したり、×ボタンにスニペットを活用するなど、ユーザーが操作しやすいレイアウトを意識しました。
+- **パフォーマンス最適化**:
+  `useCallback` や依存配列（dependency array）を適切に整理し、無駄な再レンダリングを防ぐ実装を行いました。
+
+## 📦 ディレクトリ構造
+```text
+src/
+├── components/
+│   ├── ui/          # Chakra UI v3 のスニペット（toaster, close-buttonなど）
+│   ├── organisms/   # ユーザーカードなどの主要パーツ
+│   └── pages/       # 各画面（UserManagementなど）
+├── hooks/           # カスタムフック（useMessage, useAllUsersなど）
+└── App.tsx          # エントリーポイント
+
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
