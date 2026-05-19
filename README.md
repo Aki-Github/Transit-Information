@@ -16,7 +16,7 @@ Chakra UI v3 と React (TypeScript) を使用して構築した、シンプル�
 
 ### 1. ログイン画面
 シンプルなカードデザインのログインインターフェースです。
-<img width="471" height="423" alt="Login_image" src="https://github.com/user-attachments/assets/aca07dd7-a20f-41fb-ad74-b0c96c19c8ab" alt="ログイン画面" />
+<img width="600" height="600" alt="Login_image" src="https://github.com/user-attachments/assets/aca07dd7-a20f-41fb-ad74-b0c96c19c8ab" alt="ログイン画面" />
 
 
 ### 2. 運行情報一覧画面
