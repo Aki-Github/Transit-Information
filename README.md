@@ -3,7 +3,9 @@
 Chakra UI v3 と React (TypeScript) を使用して構築した、シンプルでモダンなユーザー管理フロントエンドアプリケーションです。
 
 ## 🚀 デモ (オプション)
-- 公開URL: [ここにURL]
+- 公開URL: [https://transit-information-d8bs9ehdi-akinori-kikuchi-s-projects.vercel.app/]
+- メールアドレス : user@example.com
+- パスワード : User234!
 
 ## ✨ 主な機能
 - **首都圏鉄道 運行情報**: 外部API（公共交通オープンデータセンターODPT）から取得した運行情報をカード形式で綺麗に整列・レスポンシブ表示
