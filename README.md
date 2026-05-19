@@ -10,6 +10,24 @@ Chakra UI v3 と React (TypeScript) を使用して構築した、シンプル�
 - **バス停マップ**: 首都圏の駅名や地名を検索して、周辺のバス停を国土地理院の地図上にピンで配置
 - **トースト通知**: ログインなどのアクション成否を右上にトーストメッセージでユーザーへ通知
 
+## 📸 スクリーンショット / プレビュー
+
+アプリの主要な画面イメージです。
+
+### 1. ログイン画面
+シンプルなカードデザインのログインインターフェースです。
+<img width="471" height="423" alt="Login_image" src="https://github.com/user-attachments/assets/aca07dd7-a20f-41fb-ad74-b0c96c19c8ab" alt="ログイン画面" />
+
+
+### 2. 運行情報一覧画面
+JR東日本、東京メトロ、東京都交通局などの運行情報をカテゴリごとにカード化し、遅延情報などを視覚的に分かりやすく一覧表示します。
+<img width="1515" height="1107" alt="Operation_image" src="https://github.com/user-attachments/assets/f085eefa-f78d-4da1-9d6b-16b99181b022" alt="運行情報一覧" />
+
+
+### 3. バス停マップ＆時刻表（メイン機能）
+地図上にバス停のピンを表示し、ピンをクリックすることで該当するバス停の正確な時刻表をその場で確認できます。
+<img width="1451" height="1145" alt="BusstopMap_image" src="https://github.com/user-attachments/assets/820ab768-4f2a-49c7-a193-6526dea93dec" alt="バス停マップ" />
+
 ## 🛠 使用技術
 - **Frontend**: React (TypeScript), Create React App
 - **UI Library**: Chakra UI v3 (最新のコンポーネントシステムに対応)
