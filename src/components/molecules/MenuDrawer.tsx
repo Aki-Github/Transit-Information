@@ -51,6 +51,9 @@ export const MenuDrawer: FC<Props> = memo((props) => {
                 <Button w="100%" variant="ghost" justifyContent="start" onClick={() => onClickNav("/home/english_info")}>
                 English Info
                 </Button>
+                <Button w="100%" variant="ghost" justifyContent="start" onClick={() => onClickNav("/home/busstop_map")}>
+                バス停マップ
+                </Button>
                 <Button 
                   w="100%" 
                   variant="ghost" 
