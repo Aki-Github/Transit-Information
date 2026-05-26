@@ -27,6 +27,34 @@ export const TrainInfoSection: FC<Props> = memo((props) => {
 
   const recipe = useRecipe({ recipe: cardRecipe });
 
+  const translateStatusToEn = (textJa: string): string => {
+    if (!textJa) return "No information available";
+    
+    // 💡 よくある運行情報のパターンを網羅
+    if (textJa.includes("現在、運行情報はありません") || 
+        textJa.includes("平常通り運転") || 
+        textJa.includes("平常どおり運転") ||
+        textJa.includes("遅延はありません") ||
+        textJa.includes("平常運転")) {
+      return "Normal operation. There is no current delay information.";
+    }
+    if (textJa.includes("遅れが")) {
+      return "Delays are occurring.";
+    }
+    if (textJa.includes("運転見合わせ")) {
+      return "Operation suspended.";
+    }
+    if (textJa.includes("ダイヤ乱れ")) {
+      return "Schedule disrupted.";
+    }
+    if (textJa.includes("直通運転を中止")) {
+      return "Through-service has been canceled.";
+    }
+
+    // 想定外の文章だった場合は、そのまま日本語を返すか一般的な文言にする
+    return textJa; 
+  };
+
   // 遅延線と平常線のハイブリッドマージ ---
   let displayTrains = [...trainsData];
 
@@ -68,7 +96,7 @@ export const TrainInfoSection: FC<Props> = memo((props) => {
         {/* onRefetch というプロパティが渡されているときだけ更新ボタンを表示する */}
         {onRefetch && (
           <Button onClick={onRefetch} variant="outline" size="sm">
-            情報を更新する
+            Update Information
           </Button>
         )}
       </Flex>
@@ -97,7 +125,8 @@ export const TrainInfoSection: FC<Props> = memo((props) => {
                 <Text mt="1" color="gray.700">
                   {languageJa 
                     ? `状況: ${info["odpt:trainInformationText"].ja}`
-                    : `Status: ${info["odpt:trainInformationText"].en ?? info["odpt:trainInformationText"].ja}`
+                    : `Status: ${info["odpt:trainInformationText"].en ?? 
+                      translateStatusToEn(info["odpt:trainInformationText"].ja)}`
                   }
                 </Text>
               </Box>
