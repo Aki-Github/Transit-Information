@@ -5,10 +5,11 @@ import { Box, Stack, Spinner, Center } from "@chakra-ui/react";
 import { TrainInfoSection } from "../features/TrainInfoSection";
 import { trainCardRecipe } from "../recipes/trainCard.recipe";
 import { useTrainInformation } from "../../hooks/useTrainInformation";
-import { getRailwayNameJa } from "../../hooks/useGetRailwayNameJa";
+import { useGetRailwayNameJa } from "../../hooks/useGetRailwayNameJa";
 
 export const EnglishInfo: FC = memo(() => {
   const { allTrains, loading, refetch } = useTrainInformation();
+  const { getRailwayNameJa, loading: railwayLoading } = useGetRailwayNameJa();
 
   // 表示したい事業者のリストを定義しておく
   const OPERATORS = [
@@ -30,7 +31,7 @@ export const EnglishInfo: FC = memo(() => {
   ];
 
   // ローディング中の画面表示
-  if (loading) {
+  if (loading || railwayLoading) {
     return (
       <Center h="50vh">
         <Spinner size="xl" />
@@ -55,7 +56,7 @@ export const EnglishInfo: FC = memo(() => {
               key={op.id}
               title={op.title}
               languageJa={false} // 英語表示なので false を渡す
-              normalWord={op.id === "odpt.Operator:Toei" ? "遅延はありません" : "平常"}
+              normalWord={op.id === "odpt.Operator:Toei" ? "No delays" : "On time"}
               trainsData={filteredTrains}
               cardRecipe={trainCardRecipe}
               getRailwayNameJa={getRailwayNameJa}

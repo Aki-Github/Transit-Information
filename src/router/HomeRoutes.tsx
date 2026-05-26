@@ -2,6 +2,7 @@ import { Home } from "../components/pages/Home";
 import { Page404 } from "../components/pages/Page404";
 import { EnglishInfo } from "../components/pages/EnglishInfo";
 import { BusstopMap } from "../components/pages/BusstopMap";
+import { Test } from "../components/pages/Test";
 
 export const HomeRoutes = [
   {
@@ -15,6 +16,10 @@ export const HomeRoutes = [
   {
     path: "busstop_map",
     element: <BusstopMap />,
+  },
+  {
+    path: "test",
+    element: <Test />,
   },
   {
     path: "*",

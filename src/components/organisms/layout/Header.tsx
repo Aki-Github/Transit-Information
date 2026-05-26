@@ -1,14 +1,17 @@
 import { Box, Flex, Heading, Link } from '@chakra-ui/react';
 import { FC, memo, useState, useContext } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { MenuRoot, MenuTrigger, MenuContent, MenuItem } from "../../../components/ui/menu";
 
 import { MenuIconButton } from '../../atomos/button/MenuIconButton';
 import { MenuDrawer } from '../../molecules/MenuDrawer';
 import { LoginUserContext } from "../../../providers/LoginUserProvider";
 import { supabase } from "../../../lib/supabaseClient"; // これを追加
+import { useAdmin } from "../../../hooks/admin/useAdmin";
 
 export const Header: FC = memo(() => {
   const navigate = useNavigate();
+  const { isAdmin } = useAdmin(); // ⭕ 管理者判定を取得
   const { setLoginUser } = useContext(LoginUserContext);
 
   // 開閉状態を自分で持つようにします
@@ -77,6 +80,86 @@ export const Header: FC = memo(() => {
               </Link> 
             </RouterLink>
           </Box>
+
+          {/* ⭕ 都営地下鉄運行ナビをドロップダウンメニューに変更 */}
+          <Box pr={4}>
+            <MenuRoot positioning={{ placement: "bottom-start" }}>
+              <MenuTrigger asChild>
+                <Link 
+                  as="span" 
+                  color="inherit" 
+                  _hover={{ opacity: 0.8, cursor: "pointer" }}
+                  userSelect="none"
+                >
+                  都営地下鉄運行ナビ ▼
+                </Link>
+              </MenuTrigger>
+
+              <MenuContent bg="gray.800" borderColor="gray.700" color="white" minW="160px">
+                <MenuItem 
+                  value="asakusa" 
+                  color="white"
+                  _hover={{ bg: "red.600", color: "white" }} 
+                  onClick={() => navigate("/live/asakusa")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚇 浅草線ナビ
+                </MenuItem>
+                <MenuItem 
+                  value="mita" 
+                  color="white"
+                  _hover={{ bg: "blue.600", color: "white" }} 
+                  onClick={() => navigate("/live/mita")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚇 三田線ナビ
+                </MenuItem>
+                <MenuItem 
+                  value="shinjuku" 
+                  color="white"
+                  _hover={{ bg: "green.600", color: "white" }} 
+                  onClick={() => navigate("/live/shinjuku")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚇 新宿線ナビ
+                </MenuItem>
+                <MenuItem 
+                  value="oedo" 
+                  color="white"
+                  _hover={{ bg: "purple.600", color: "white" }} 
+                  onClick={() => navigate("/live/oedo")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚇 大江戸線ナビ
+                </MenuItem>
+                <MenuItem 
+                  value="arakawa" 
+                  color="white"
+                  _hover={{ bg: "pink.600", color: "white" }} 
+                  onClick={() => navigate("/live/arakawa")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚇 さくらトラム ナビ
+                </MenuItem>
+              </MenuContent>
+            </MenuRoot>
+          </Box>
+
+          {/* 管理者（isAdmin === true）の時だけ、ひっそりとメニューを表示する */}
+          {isAdmin && (
+            <Box pr={4}>
+              <RouterLink to="/admin" style={{ textDecoration: "none" }}>
+                <Link as="span" color="inherit" _hover={{ opacity: 0.8 }}>
+                  管理者ダッシュボード
+                </Link>
+              </RouterLink>
+            </Box>
+          )}
 
           <RouterLink to="/home/settings" style={{ textDecoration: "none", color: "inherit" }}>
             <Link 

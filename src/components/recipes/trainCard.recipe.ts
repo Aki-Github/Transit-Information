@@ -20,6 +20,10 @@ const trainCardConfig = defineRecipe({
         bg: "red.50",
         borderColor: "red.250",
       },
+      noInfo: {
+        bg: "orange.50",
+        borderColor: "orange.250",
+      },
     },
   },
 });
