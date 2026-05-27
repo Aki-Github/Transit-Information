@@ -3,7 +3,7 @@
 Chakra UI v3 と React (TypeScript) を使用して構築した、シンプルでモダンなユーザー管理フロントエンドアプリケーションです。
 
 ## 🚀 デモ (オプション)
-- 公開URL: [https://transit-information-b34gqg1zs-akinori-kikuchi-s-projects.vercel.app/]
+- 公開URL: [https://transit-information.vercel.app/]
 - メールアドレス : user@example.com
 - パスワード : User234!
 
