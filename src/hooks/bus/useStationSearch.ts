@@ -1,12 +1,14 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
-// 型定義
+// フロントエンドで扱うバス停の型定義（ODPTのプロパティ名に合わせてマッピングします）
 interface BusstopData {
   "owl:sameAs": string;
   "dc:title": string;
   "geo:lat": number;
   "geo:long": number;
+  "odpt:operator"?: string;
 }
 
 // ★ 型定義を BusstopPoleTimetable 用に新しく定義
@@ -39,10 +41,33 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
   const [busstops, setBusstops] = useState<BusstopData[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
-
-  // ★ 時刻表用の新しいState
   const [selectedTimetable, setSelectedTimetable] = useState<BusstopPoleTimetableData[] | null>(null);
   const [loadingTimetable, setLoadingTimetable] = useState<boolean>(false);
+
+  // 共通ロジック：Supabaseの関数を呼び出してステートにセットする関数
+  const fetchNearbyBusstopsFromSupabase = async (latitude: number, longitude: number) => {
+    const RADIUS = 1000; // 半径1,000メートル
+    
+    const { data, error } = await supabase.rpc('search_nearby_busstops', {
+      target_lat: latitude,
+      target_lon: longitude,
+      radius_meters: RADIUS
+    });
+
+    if (error) throw error;
+
+    if (data) {
+      // 地図描画コンポーネント（既存コード）が壊れないよう、DBのカラム名をODPTのプロパティ名に綺麗に変換
+      const formattedBusstops: BusstopData[] = data.map((item: any) => ({
+        "owl:sameAs": item.owl_sameas,
+        "dc:title": item.title,
+        "geo:lat": item.lat,
+        "geo:long": item.long,
+        "odpt:operator": item.operator
+      }));
+      setBusstops(formattedBusstops);
+    }
+  };
 
   // 駅検索のロジック
   const searchStationAndBusstops = async (query: string) => {
@@ -52,30 +77,26 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
     setErrorMessage('');
     
     try {
-      // 1. 駅の検索
-      const stationUrl = `https://api.odpt.org/api/v4/odpt:Station?dc:title=${encodeURIComponent(query)}&acl:consumerKey=${API_KEY}`;
-      const stationResponse = await fetch(stationUrl);
-      const stationData = await stationResponse.json();
-
       let lat: number | null = null;
       let lon: number | null = null;
 
-      // 駅データが見つかった場合
-      if (stationData && stationData.length > 0) {
-        // ★ 修正：配列の中から、座標（latとlong）を両方持っている最初の駅データを検索する
-        const stationWithCoords = stationData.find(
-          (station: any) => station["geo:lat"] !== undefined && station["geo:long"] !== undefined
-        );
+      // Supabase から駅を検索
+      const { data: stationData, error: sbError } = await supabase
+        .from('station_locations')
+        .select('lat, lon, station_name')
+        .ilike('station_name', `%${query.trim()}%`) // %で囲むことで「〜を含む」というあいまい検索になります
+        .not('lat', 'is', null) // 念のため座標が入っているデータに限定
+        .limit(1); // 最初の1件を取得
 
-        // 座標を持つ駅が見つかったら、その座標を採用する
-        if (stationWithCoords) {
-          lat = stationWithCoords["geo:lat"];
-          lon = stationWithCoords["geo:long"];
-        }
-        // ※ もし stationData はあるのに全社とも座標がなかった場合は、
-        // 下記の「else」に流れて自動的に国土地理院の住所検索（ジオコーダ）に切り替わります！
+      if (sbError) throw sbError;
+
+      if (stationData && stationData.length > 0) {
+        // 駅データが見つかった場合
+        lat = stationData[0].lat;
+        lon = stationData[0].lon;
+        console.log(`駅データヒット: ${stationData[0].station_name} (${lat}, ${lon})`);
       } 
-      // ★ 2. 駅が見つからなかった場合、国土地理院のジオコーダで住所検索を試みる
+      // 駅が見つからなかった場合、国土地理院のジオコーダで住所検索を試みる
       else {
         // 国土地理院の地名・住所検索API
         const gsiUrl = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(query)}`;
@@ -88,7 +109,6 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
           return;
         }
 
-        // 国土地理院APIの座標データは [経度(lon), 緯度(lat)] の順の配列（geometry.coordinates）で返ってきます
         const targetPlace = gsiData[0];
         if (targetPlace.geometry && targetPlace.geometry.coordinates) {
           lon = targetPlace.geometry.coordinates[0];
@@ -96,7 +116,6 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
         }
       }
 
-      // 駅、または住所から座標が無事取得できたかチェック
       if (!lat || !lon) {
         setErrorMessage('指定された場所の座標データが取得できませんでした。');
         return;
@@ -105,13 +124,8 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
       // 地図の中心を更新
       setMapCenter([lat, lon]);
 
-      // 2. 周辺のバス停を検索
-      const RADIUS = 1000;
-      const busstopUrl = `https://api.odpt.org/api/v4/places/odpt:BusstopPole?lat=${lat}&lon=${lon}&radius=${RADIUS}&acl:consumerKey=${API_KEY}`;
-      const busstopResponse = await fetch(busstopUrl);
-      const busstopData: BusstopData[] = await busstopResponse.json();
-
-      setBusstops(busstopData);
+      // 2. 周辺のバス停を Supabase の RPC から爆速検索
+      await fetchNearbyBusstopsFromSupabase(lat, lon);
       setSelectedTimetable(null); // ★ 新しい駅を検索した時は、前回の時刻表選択をクリア
     } catch (error) {
       console.error("検索エラー:", error);
@@ -121,13 +135,12 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
     }
   };
 
-  // ★ 新しいエンドポイント「odpt:BusstopPoleTimetable」を叩くように修正
+  // 時刻表の取得
   const fetchTimetable = async (busstopId: string) => {
     setLoadingTimetable(true);
     setSelectedTimetable(null);
 
     try {
-      // ユーザーさんが見つけてくれた正しいURL構成
       const url = `https://api.odpt.org/api/v4/odpt:BusstopPoleTimetable?odpt:busstopPole=${busstopId}&acl:consumerKey=${API_KEY}`;
       const response = await fetch(url);
       const data: BusstopPoleTimetableData[] = await response.json();
@@ -146,11 +159,7 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
   useEffect(() => {
     const fetchInitialBusstops = async () => {
       try {
-        // initialCenter[0] が緯度、initialCenter[1] が経度
-        const busstopUrl = `https://api.odpt.org/api/v4/places/odpt:BusstopPole?lat=${initialCenter[0]}&lon=${initialCenter[1]}&radius=1000&acl:consumerKey=${API_KEY}`;
-        const res = await fetch(busstopUrl);
-        const data = await res.json();
-        setBusstops(data);
+        await fetchNearbyBusstopsFromSupabase(initialCenter[0], initialCenter[1]);
       } catch (error) {
         console.error("初期バス停の取得に失敗しました:", error);
       }

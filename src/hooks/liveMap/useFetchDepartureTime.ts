@@ -25,16 +25,23 @@ export const useFetchDepartureTime = ({ stationId, trainNumber, isOpen }: UseFet
     const fetchData = async () => {
       setLoading(true);
       setError(null);
+      // 🕒 現在の時刻を「HH:MM」形式で取得（例: "22:05"）
+      const now = new Date();
+      const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
       console.log(`Fetching departure time for stationId: ${stationId}, trainNumber: ${trainNumber}`);
       try {
         // 効率化ポイント: 2つの異なるテーブルへのクエリを Promise.all で並列処理（超高速）
         const [timetableResult, stationResult] = await Promise.all([
-          // 1. 時刻表の取得
+          // 1. 時刻表の取得（🟢 修正ポイント：現在時刻以降で最も近い1便に絞り込む）
           supabase
             .from("station_timetables")
             .select("departure_time")
             .eq("station_id", stationId)
             .eq("train_number", trainNumber)
+            .gte("departure_time", currentHHMM) // 👈 現在時刻以上の便に絞る（例: 22:05以降）
+            .order("departure_time", { ascending: true }) // 👈 時間が早い順（昇順）に並べる
+            .limit(1) // 👈 最も現在時刻に近い1件だけを取得
             .maybeSingle(),
 
           // 2. 駅マスタから駅名（name）の取得
@@ -51,6 +58,24 @@ export const useFetchDepartureTime = ({ stationId, trainNumber, isOpen }: UseFet
         if (stationResult.error) throw stationResult.error;
 
         // 時刻表データのリフレッシュ
+        console.log("Fetched departure time record:", timetableResult.data);
+        if (timetableResult.data) {
+          setDepartureTime(timetableResult.data.departure_time);
+        } else {
+          // 💡 もし深夜で「現在時刻以降の便」がDBにない場合は、全体の最初の便をフォールバックとして検索します
+          const fallbackResult = await supabase
+            .from("station_timetables")
+            .select("departure_time")
+            .eq("station_id", stationId)
+            .eq("train_number", trainNumber)
+            .order("departure_time", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          setDepartureTime(fallbackResult.data?.departure_time || null);
+        }
+        
+        // 時刻表データのリフレッシュ
         console.log("Fetched departure time:", timetableResult.data);
         if (timetableResult.data) {
           setDepartureTime(timetableResult.data.departure_time);
@@ -62,6 +87,8 @@ export const useFetchDepartureTime = ({ stationId, trainNumber, isOpen }: UseFet
         console.log("Fetched station name:", stationResult.data);
         if (stationResult.data) {
           setStationName(stationResult.data.name);
+        } else if (stationId === 'odpt.Station:Toei.Oedo.Tochomae') {
+          setStationName("都庁前"); // Tochomaeの特例対応
         } else {
           setStationName(null);
         }

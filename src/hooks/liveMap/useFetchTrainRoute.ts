@@ -40,12 +40,24 @@ export const useFetchTrainRoute = ({ currentStationId, trainNumber, isOpen }: Us
       setLoading(true);
       setError(null);
       try {
-        // ⭕ 1. 列車番号をキーに、その列車が通るすべての駅の時刻表を出発時刻順に取得
+        // 💡 1. currentStationId から前方一致用のベース文字列を抽出
+        const lastDotIndex = currentStationId.lastIndexOf(".");
+        const stationBasePrefix = lastDotIndex !== -1 
+          ? currentStationId.substring(0, lastDotIndex) 
+          : currentStationId;
+        
+        // 🕒 現在の時刻を「HH:MM」形式で取得（例: "22:05"）
+        const now = new Date();
+        const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        // 💡 2. 列車番号 ＋ 【同じ路線のみ】に絞って時刻表を取得
+        // ここに .like("station_id", `${stationBasePrefix}.%`) を追加することで、他路線の重複列車を完全に弾きます！
         const { data, error: sbError } = await supabase
           .from("station_timetables")
           .select("station_id, departure_time")
           .eq("train_number", trainNumber)
-          .order("departure_time", { ascending: true }); // 💡ここが肝！時刻順に並べる
+          .like("station_id", `${stationBasePrefix}.%`) // 👈 🟢 ここが今回の超重要追加ポイント！
+          .order("departure_time", { ascending: true });
 
         if (sbError) throw sbError;
 
@@ -67,10 +79,18 @@ export const useFetchTrainRoute = ({ currentStationId, trainNumber, isOpen }: Us
 
         setFullRoute(formattedRoute);
 
-        // ⭕ 2. 「現在の駅」が配列の何番目（インデックス）にあるかを特定
-        const currentIndex = formattedRoute.findIndex(
-          (r) => r.stationId === currentStationId
+        // 💡 3. 【超重要修正】「現在時刻以降」で、かつ「指定された駅」に一致するレコードを検索する
+        // 朝・昼・夜と何度も同じ駅を通るデータから、"今走っている時間帯の駅" を正しくピンポイントで探します
+        let currentIndex = formattedRoute.findIndex(
+          (r) => r.stationId.startsWith(stationBasePrefix) && r.departureTime >= currentHHMM         
         );
+
+        // 💡 フォールバック: 深夜などで現在時刻以降のデータがマッチしない場合は、従来通り最初のマッチを使う
+        if (currentIndex === -1) {
+          currentIndex = formattedRoute.findIndex(
+            (r) => r.stationId.startsWith(stationBasePrefix)
+          );
+        }
 
         if (currentIndex === -1) {
           // 万が一現在の駅が時刻表リストにない場合（他社線直通など）は安全のためリセット
@@ -82,9 +102,9 @@ export const useFetchTrainRoute = ({ currentStationId, trainNumber, isOpen }: Us
           return;
         }
 
-        // 3. インデックスを基準に「当駅」「次」「その次」「終点」を計算してセット
+        // 4. インデックスを基準に後続の駅を計算（既存ロジックをそのまま活用）
         if (currentIndex  < formattedRoute.length) {
-            setCurrentStation(formattedRoute[currentIndex]);
+            setCurrentStation(formattedRoute[currentIndex]); // 現在地の駅（1つ前の駅が現在地）
         } else {
           // 現在地がすでに終点の場合は当駅だけセットして他はnull
           setCurrentStation(null);  

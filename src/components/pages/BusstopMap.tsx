@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Box, Flex, Input, Button, Text, useSlotRecipe, Heading, Separator } from '@chakra-ui/react';
 import L from 'leaflet';
 
-import { useStationSearch } from '../../hooks/useStationSearch';
+import { useStationSearch } from '../../hooks/bus/useStationSearch';
 import { searchHeaderRecipe } from '../recipes/searchHeaderRecipe';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';

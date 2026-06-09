@@ -73,15 +73,23 @@ export const Header: FC = memo(() => {
             </RouterLink>
           </Box>
 
-          <Box pr={4}>
+          {/* <Box pr={4}>
             <RouterLink to="/home/busstop_map" style={{ textDecoration: "none" }}>
+              <Link as="span" color="inherit" _hover={{ opacity: 0.8 }}>
+                バス停マップ
+              </Link> 
+            </RouterLink>
+          </Box> */}
+
+          <Box pr={4}>
+            <RouterLink to="/home/busRoute_map" style={{ textDecoration: "none" }}>
               <Link as="span" color="inherit" _hover={{ opacity: 0.8 }}>
                 バス停マップ
               </Link> 
             </RouterLink>
           </Box>
 
-          {/* ⭕ 都営地下鉄運行ナビをドロップダウンメニューに変更 */}
+          {/* 地下鉄運行ナビ */}
           <Box pr={4}>
             <MenuRoot positioning={{ placement: "bottom-start" }}>
               <MenuTrigger asChild>
