@@ -5,8 +5,9 @@ import { Box, Flex, Input, Button, Text, useSlotRecipe, Heading, Separator, Badg
 import L from 'leaflet';
 
 import { useStationSearch } from '../../hooks/bus/useStationSearch';
-import { useActiveBuses } from '../../hooks/bus/useActiveBuses';
+import { useActiveTokyoBuses } from '../../hooks/bus/useActiveTokyoBuses';
 import { searchHeaderRecipe } from '../recipes/searchHeaderRecipe';
+import { busMapPopupRecipe } from '../recipes/busMapPopupRecipe';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import { BusTimetableList } from '../organisms/timetable/BusTimetableList';
@@ -22,7 +23,7 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// 走行中のバス専用アイコンを作成 (絵文字やSVG等でお好みに変更可能)
+// 走行中のバス専用アイコンを作成
 const activeBusIcon = L.icon({
   iconUrl: 'https://maps.google.com/mapfiles/ms/icons/bus.png', // Googleのバスピン等（任意に変更可）
   iconSize: [32, 32],
@@ -39,7 +40,49 @@ const ChangeView: FC<{ center: [number, number] }> = ({ center }) => {
   return null;
 };
 
-export const BusRouteMap: FC = memo(() => {
+interface MapControllerProps {
+  onSearchCurrentCenter: (lat: number, lon: number) => Promise<void>;
+  loading: boolean;
+}
+
+/**
+ * 💡 画面上に浮かぶ「現在地で検索」ボタンを地図コンポーネント内部に定義
+ * MapContainer の内側にあるため、useMap() を安全に呼び出して現在の中心座標をブッコ抜けます。
+ */
+const MapController: FC<MapControllerProps> = ({ onSearchCurrentCenter, loading }) => {
+  const map = useMap();
+
+  const handleGetCurrentCenter = async () => {
+    const center = map.getCenter(); // 現在ユーザーが表示している地図の真ん中の座標を取得
+    await onSearchCurrentCenter(center.lat, center.lng);
+  };
+
+  return (
+    <Box
+      position="absolute"
+      top="20px"
+      left="50%"
+      transform="translateX(-50%)"
+      zIndex="1000" // レイヤーの最前面に配置
+    >
+      <Button
+        onClick={handleGetCurrentCenter}
+        loading={loading}
+        colorPalette="teal"
+        variant="solid"
+        size="sm"
+        borderRadius="full"
+        boxShadow="0 4px 12px rgba(0,0,0,0.15)"
+        fontWeight="bold"
+        px="6"
+      >
+        🔍 このエリアで再検索
+      </Button>
+    </Box>
+  );
+};
+
+export const BusStopTokyoMap: FC = memo(() => {
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const { 
@@ -49,43 +92,48 @@ export const BusRouteMap: FC = memo(() => {
     errorMessage, 
     selectedTimetable,
     loadingTimetable,
+    destination, // 追加で行先も取得しておく（例: "渋谷駅行き"）
     searchStationAndBusstops,
+    searchByCoordinates, // 💡 フックに追加した関数を展開
     fetchTimetable 
   } = useStationSearch([35.6812, 139.7671]);
 
-  // 💡 ★ここを差し替え：膨大だった内部ロジックをフック1行で解決！
-  const { activeBuses } = useActiveBuses(busstops);
+  const { activeBuses } = useActiveTokyoBuses(busstops);
 
   const handleSearch = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     await searchStationAndBusstops(searchQuery);
   };
 
-  const recipe = useSlotRecipe({ key: "searchHeader", recipe: searchHeaderRecipe });
-  const styles: any = recipe();
+// 💡 レシピのインスタンス化
+  const headerRecipe = useSlotRecipe({ key: "searchHeader", recipe: searchHeaderRecipe });
+  const headerStyles: any = headerRecipe();
+
+  const popupRecipe = useSlotRecipe({ key: "busMapPopup", recipe: busMapPopupRecipe });
+  const popupStyles: any = popupRecipe();
 
   return (
     <Flex direction="column" h="100vh" w="100%">
       
       {/* 検索ヘッダー */}
-      <Box {...styles.container}>
+      <Box {...headerStyles.container}>
         <form onSubmit={handleSearch}>
-          <Flex {...styles.form}>
+          <Flex {...headerStyles.form}>
             <Input
               type="text"
               placeholder="駅名もしくは地名を入力（例：東京、新宿、麻生）"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              {...styles.input}
+              {...headerStyles.input}
             />
-            <Button type="submit" loading={loading} {...styles.button}>
+            <Button type="submit" loading={loading} {...headerStyles.button}>
               検索
             </Button>
           </Flex>
         </form>
-        {errorMessage && <Text {...styles.errorText}>{errorMessage}</Text>}
+        {errorMessage && <Text {...headerStyles.errorText}>{errorMessage}</Text>}
         <Flex justify="space-between" align="center" mt="1">
-          <Text {...styles.countText}>周辺のバス停件数: {busstops.length} 件</Text>
+          <Text {...headerStyles.countText}>周辺のバス停件数: {busstops.length} 件 （対応事業者：都営バス、西武バス、京王バス、東急バス）</Text>
           {/* 💡 走行中台数のバッジ表示（あるとリッチに見えます） */}
           {activeBuses.length > 0 && (
             <Text fontSize="xs" color="blue.600" fontWeight="bold">
@@ -100,6 +148,12 @@ export const BusRouteMap: FC = memo(() => {
         <MapContainer center={mapCenter} zoom={16} style={{ height: '100vh', width: '100%' }}>
           
           <ChangeView center={mapCenter} />
+
+          {/* 💡 コントローラーを配置（ボタンが地図上部中央にフロート配置されます） */}
+          <MapController 
+            onSearchCurrentCenter={searchByCoordinates} 
+            loading={loading} 
+          />
 
           <TileLayer
             attribution='© <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
@@ -125,18 +179,18 @@ export const BusRouteMap: FC = memo(() => {
                   }}
                 >
                   <Popup>
-                    <Box minW="260px">
+                    <Box {...popupStyles.popupContainer}>
                       <Heading size="sm" mb="1">🚏 {stop["dc:title"]}</Heading>
                       
-                      {/* 💡 接近情報の表示セクション */}
+                      {/* 接近情報の表示セクション */}
                       {approachingBuses.length > 0 ? (
-                        <Box bg="orange.50" p="2" borderRadius="md" my="2" border="1px solid" borderColor="orange.200">
-                          <Heading size="xs" color="orange.700" mb="1">⚠️ バス接近情報</Heading>
+                        <Box {...popupStyles.approachingBox}>
+                          <Heading {...popupStyles.approachingHeader}>⚠️ バス接近情報</Heading>
 
                             {approachingBuses.map((bus, index) => (
-                              <Box key={`${bus.id}-${index}`} py="1" _notFirst={{ borderTop: "1px dashed", borderColor: "orange.200", mt: "1" }}>
+                              <Box key={`${bus.id}-${index}`} {...popupStyles.approachingRow}>
                                 <Flex justify="space-between" align="center">
-                                  <Text fontSize="xs" color="gray.700" fontWeight="bold">
+                                  <Text {...popupStyles.approachingBusName}>
                                     {bus.operatorName} ({bus.busNumber}号車)
                                   </Text>
                                   <Badge colorPalette="orange" variant="solid">
@@ -144,24 +198,24 @@ export const BusRouteMap: FC = memo(() => {
                                   </Badge>
                                 </Flex>
                                 
-                                {/* 👇★ここを追加：接近中のバスの行先バッジを表示 */}
-                                <Text fontSize="10px" color="blue.600" mt="0.5" fontWeight="medium">
+                                <Text {...popupStyles.approachingDestination}>
                                   🏁 終点: {bus.destinationSign}
                                 </Text>
                               </Box>
                             ))}
                         </Box>
                       ) : (
-                        <Box bg="gray.50" p="1.5" borderRadius="md" my="2" textAlign="center">
-                          <Text fontSize="xs" color="gray.500">現在、直前の区間にバスはありません</Text>
+                        <Box {...popupStyles.noBusBox}>
+                          <Text {...popupStyles.noBusText}>現在、直前の区間にバスはありません</Text>
                         </Box>
                       )}
 
                       <Separator my="2" />
-                      <Heading size="xs" color="fg.muted" mb="2">標準時刻表</Heading>
+                      <Heading {...popupStyles.sectionHeader}>標準時刻表</Heading>
                       <BusTimetableList
                         selectedTimetable={selectedTimetable || []}
                         loadingTimetable={loadingTimetable}
+                        destination={destination}
                       />
                     </Box>
                   </Popup>
@@ -187,46 +241,45 @@ export const BusRouteMap: FC = memo(() => {
                   
                   <Separator my="2" />
                   
-                  {/* 💡 運行ルートのタイムライン風表示（3駅仕様へ進化） */}
-                  <Box pl="2" borderLeft="2px solid" borderColor="blue.100" position="relative">
+                  {/* 運行ルートのタイムライン風表示 */}
+                  <Box {...popupStyles.timelineContainer}>
                     
                     {/* 1. 前の停留所 */}
-                    <Box mb="3" position="relative">
-                      <Box position="absolute" left="-13px" top="4px" w="8px" h="8px" borderRadius="full" bg="gray.300" />
-                      <Text fontSize="xs" color="gray.500">
-                        前：{bus.fromStationName}（発車済）
+                    <Box {...popupStyles.timelineItem}>
+                      <Box {...popupStyles.timelineDotPrev} />
+                      <Text {...popupStyles.timelineText} color="gray.500">
+                        {bus.toBusstopPoleId ? `前：${bus.fromStationName}（発車済）` : `今：${bus.fromStationName}（到着済）`}
                       </Text>
                     </Box>
 
                     {/* 2. 今向かっている停留所（次） */}
-                    <Box mb="3" position="relative">
-                      <Box position="absolute" left="-13px" top="3px" w="10px" h="10px" borderRadius="full" bg="green.500" />
+                    <Box {...popupStyles.timelineItem}>
+                      <Box {...popupStyles.timelineDotActive} />
                       
-                      {/* 🟢 修正ポイント：1つのText要素の中で左右に泣き別れさせます。これにより縦位置のズレは物理的に100%発生しなくなります */}
-                      <Text fontSize="xs" fontWeight="bold" color="green.700" display="flex" alignItems="center" w="full">
-                        {/* バス停名テキスト（前・次々と完全に同じ左端からスタートします） */}
+                      <Text {...popupStyles.timelineText} fontWeight="bold" color="green.700">
                         <span>
-                          次：{busstops.find(s => s["owl:sameAs"] === bus.toBusstopPoleId)?.["dc:title"] || "走行中..."}
+                          {bus.toBusstopPoleId ? `次：${bus.nextBusstopName || '走行中...'}` : "終点到着"}
                         </span>
                         
-                        {/* 右側：計算された到着予測時刻（ms="auto" で文字の高さのまま自動的に右端へ吸着します） */}
                         {bus.arrivalEstimateTime && (
-                          <Box as="span" color="blue.600" ms="auto" textAlign="right">
+                          <Box as="span" {...popupStyles.timelineTime}>
                             ⏱️ {bus.arrivalEstimateTime} 着予定
                           </Box>
                         )}
                       </Text>
                       
-                      <Text fontSize="10px" color="gray.500" ml="1" mt="0.5">
-                        到着目安: あと約 {Math.max(1, 2 + bus.delayMin)} 分
-                      </Text>
+                      {bus.toBusstopPoleId && (
+                        <Text fontSize="10px" color="gray.500" ml="1" mt="0.5">
+                          到着目安: あと約 {Math.max(1, 2 + bus.delayMin)} 分
+                        </Text>
+                      )}
                     </Box>
 
                     {/* 3. 次の次の停留所 */}
                     {bus.nextNextBusstopName && (
-                      <Box position="relative">
-                        <Box position="absolute" left="-13px" top="4px" w="8px" h="8px" borderRadius="full" bg="orange.400" />
-                        <Text fontSize="xs" color="orange.700" fontWeight="medium">
+                      <Box {...popupStyles.timelineItem}>
+                        <Box {...popupStyles.timelineDotNextNext} />
+                        <Text {...popupStyles.timelineText} color="orange.700" fontWeight="medium">
                           次々：{bus.nextNextBusstopName}
                         </Text>
                       </Box>
@@ -235,8 +288,8 @@ export const BusRouteMap: FC = memo(() => {
 
                   <Separator my="2" />
                   
-                  <Flex align="center" gap="1">
-                    <Text fontSize="xs" fontWeight="bold">運行状況:</Text>
+                  <Flex {...popupStyles.statusFlex}>
+                    <Text {...popupStyles.statusLabel}>運行状況:</Text>
                     {bus.delayMin > 0 ? (
                       <Text fontSize="xs" color="red.600" fontWeight="bold">⚠️ 約 {bus.delayMin} 分遅れ</Text>
                     ) : (

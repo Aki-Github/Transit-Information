@@ -30,7 +30,9 @@ interface UseStationSearchResult {
   errorMessage: string;
   selectedTimetable: BusstopPoleTimetableData[] | null;
   loadingTimetable: boolean;
+  destination: string;
   searchStationAndBusstops: (query: string) => Promise<void>;
+  searchByCoordinates: (lat: number, lon: number) => Promise<void>; // ← 追加
   fetchTimetable: (busstopId: string, busstopName: string) => Promise<void>;
 }
 
@@ -43,6 +45,7 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [selectedTimetable, setSelectedTimetable] = useState<BusstopPoleTimetableData[] | null>(null);
   const [loadingTimetable, setLoadingTimetable] = useState<boolean>(false);
+  const [destination, setDestination] = useState<string>('');
 
   // 共通ロジック：Supabaseの関数を呼び出してステートにセットする関数
   const fetchNearbyBusstopsFromSupabase = async (latitude: number, longitude: number) => {
@@ -66,6 +69,29 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
         "odpt:operator": item.operator
       }));
       setBusstops(formattedBusstops);
+    }
+  };
+
+  // 💡 追加：指定された緯度・経度から直接周辺を検索するロジック
+  // 「現在地で検索」ボタンが押された時に、地図コンポーネントから直接この関数が呼び出されます
+  const searchByCoordinates = async (lat: number, lon: number) => {
+    setLoading(true);
+    setErrorMessage('');
+    
+    try {
+      // 1. 新しい中心点を設定（ChangeViewを通じて地図の表示も追従します）
+      setMapCenter([lat, lon]);
+
+      // 2. その中心点の周辺バス停を検索
+      await fetchNearbyBusstopsFromSupabase(lat, lon);
+
+      // 3. 検索範囲が変わるため、以前に開いていた時刻表の選択状態をクリア
+      setSelectedTimetable(null); 
+    } catch (error) {
+      console.error("座標での周辺再検索エラー:", error);
+      setErrorMessage('指定エリアの周辺データ取得中にエラーが発生しました。');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -135,19 +161,131 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
     }
   };
 
-  // 時刻表の取得
-  const fetchTimetable = async (busstopId: string) => {
+  // 🟢 西武バス・京王バス両対応：時刻表の取得
+  const fetchTimetable = async (busstopId: string, busstopName: string) => {
     setLoadingTimetable(true);
     setSelectedTimetable(null);
 
     try {
-      const url = `https://api.odpt.org/api/v4/odpt:BusstopPoleTimetable?odpt:busstopPole=${busstopId}&acl:consumerKey=${API_KEY}`;
-      const response = await fetch(url);
-      const data: BusstopPoleTimetableData[] = await response.json();
-      console.log("取得した時刻表データ:", data);
-      
-      // 平日・土曜・休日などの配列データをそのまま全て格納する
+      let data: BusstopPoleTimetableData[] = [];
+
+      // 💡 条件分岐：都営バス（odpt.BusstopPole:Toei...）かどうかを判定
+      const isToeiBus = busstopId.startsWith("odpt.BusstopPole:Toei");
+      const isTokyuBus = busstopId.startsWith("odpt.BusstopPole:Tokyu");
+
+      if (isToeiBus || isTokyuBus) {
+        // 🚌 【都営バスの場合】 ODPTのWeb APIへ時刻表をリクエスト
+        console.log(`ODPT Web APIから取得します: ${busstopId}`);
+        const url = `https://api.odpt.org/api/v4/odpt:BusstopPoleTimetable?odpt:busstopPole=${busstopId}&acl:consumerKey=${API_KEY}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          data = await response.json();
+        }
+
+        setDestination(""); // 都営バスの場合は行先情報が複雑すぎるため、UIでの表示は一旦保留（APIのデータ構造を見てから再検討）
+      }
+
+      // 🚌 【都営バス以外（西武・京王など）、またはAPI取得が空だった場合】
+      // data.length === 0 の判定を残すことで、万が一都営バスのAPIが空だった場合のバックアップにもなります
+      if (!data || data.length === 0) {
+        console.log(`[補完作動] Supabaseからデータを取得・整形します: ${busstopId}`);
+        
+        const { data: sbObjects, error: sbError } = await supabase
+          .from('bus_timetable_objects')
+          .select(`
+            departure_time,
+            bus_timetables (
+              calendar,
+              busroute,
+              title,
+              destination
+            )
+          `)
+          .eq('busstop_pole_owl_sameas', busstopId)
+          .order('departure_time', { ascending: true });
+
+        if (sbError) throw sbError;
+
+        if (sbObjects && sbObjects.length > 0) {
+          // カレンダー（標準形式）ごとに仕分けるための一時領域
+          const groupedByCalendar: { [key: string]: { route: string; title: string; objects: any[] } } = {};
+
+          let title = "";
+          let destination = "";
+          sbObjects.forEach((item: any) => {
+            const parent = item.bus_timetables;
+            if (!parent) return;
+
+            const rawCalendar = parent.calendar || "";
+            let calName = "odpt.Calendar:Weekday"; // デフォルト値
+
+            // 💡 西武バスなどの独自カレンダー文字列を ODPT 標準形式に正規化する
+            if (rawCalendar.includes("Weekday")) {
+              calName = "odpt.Calendar:Weekday";
+            } else if (rawCalendar.includes("Saturday")) {
+              calName = "odpt.Calendar:Saturday";
+            } else if (rawCalendar.includes("Sunday") || rawCalendar.includes("Holiday")) {
+              calName = "odpt.Calendar:Holiday";
+            } else if (rawCalendar.includes("平日")) {
+              calName = "odpt.Calendar:Weekday";
+            } else if (rawCalendar.includes("土曜")) {
+              calName = "odpt.Calendar:Saturday";
+            } else if (
+              rawCalendar.includes("休日") || 
+              rawCalendar.includes("日祝") || 
+              rawCalendar.includes("日曜") || 
+              rawCalendar.includes("祝日")
+            ) {
+              calName = "odpt.Calendar:Holiday";
+            } else if (rawCalendar.includes(":")) {
+              // すでにコロンが含まれる正規の形式ならそのまま採用
+              calName = rawCalendar;
+            } else {
+              // それ以外は末尾の文字を活かす形で復元を試みる
+              calName = `odpt.Calendar:${rawCalendar.split(".").pop()}`;
+            }
+
+            const routeId = parent.busroute || "";
+            const busTitle = parent.title || ""; // 「荻１２」などの系統・行先表記
+            if (title === "") {
+              title = busTitle; // 最初の1件のタイトルを全体のタイトルとして採用しておく
+            }
+            const busDestination = parent.destination || ""; // 追加で行先も取得しておく（例: "渋谷駅行き"）
+            if (destination === "") {
+              destination = busDestination;
+            }
+
+            if (!groupedByCalendar[calName]) {
+              groupedByCalendar[calName] = {
+                route: routeId,
+                title: busTitle,
+                objects: []
+              };
+            }
+
+            // 時刻データを追加
+            groupedByCalendar[calName].objects.push({
+              "odpt:departureTime": item.departure_time ? item.departure_time.substring(0, 5) : "00:00", // "21:58:00" -> "21:58"
+              "odpt:destinationSign": busTitle || undefined // 行先表示板の代わりに系統タイトルを代入してUIを親切に
+            });
+          });
+
+          setDestination(destination); // 取得した行先情報をステートにセット
+
+          // フロントエンドが期待する ODPT 互換配列へとマッピング
+          data = Object.keys(groupedByCalendar).map((calKey) => ({
+            "owl:sameAs": `${busstopId}#${calKey}`,
+            "dc:title": `${title}.${busstopName}`, // タイトルにバス停名も入れておくとUIでの識別が楽になります
+            "odpt:busroute": groupedByCalendar[calKey].route || undefined,
+            "odpt:calendar": calKey,
+            "odpt:busstopPoleTimetableObject": groupedByCalendar[calKey].objects
+          }));
+        }
+      }
+
+      console.log("最終確定の時刻表データ:", data);
       setSelectedTimetable(data);
+
     } catch (error) {
       console.error("時刻表の取得に失敗:", error);
     } finally {
@@ -176,7 +314,9 @@ export const useStationSearch = (initialCenter: [number, number] = [35.6812, 139
     errorMessage,
     selectedTimetable,
     loadingTimetable,
+    destination,
     searchStationAndBusstops,
+    searchByCoordinates, // 💡 追加：地図コンポーネントが利用できるように返却値に含める
     fetchTimetable
   };
 };

@@ -63,7 +63,7 @@ export const TrainDetailModal: FC<TrainDetailModalProps> = ({ train, isOpen, sty
   const delay = currentTrain ? (currentTrain["odpt:delay"] || 0) : 0;
 
   // 今タップされている駅IDと列車番号を渡して、Supabaseから出発時刻を取得する
-  const { stationName, loading: timeLoading } = useFetchDepartureTime({
+  const { stationName: destinationStationName, loading: timeLoading } = useFetchDepartureTime({
     stationId: currentTrain ? currentTrain["odpt:destinationStation"]?.[0] || null : null,
     trainNumber: currentTrain ? currentTrain["odpt:trainNumber"] : null,
     isOpen: isOpen
@@ -226,10 +226,10 @@ export const TrainDetailModal: FC<TrainDetailModalProps> = ({ train, isOpen, sty
                       )}
 
                       {/* 終点（目的地） */}
-                      {(terminalStation && stationName) && (
+                      {(terminalStation && destinationStationName) && (
                         <Flex justify="space-between" align="center" pt="2" borderTop="1px dashed" borderColor="gray.800">
                           <Text fontSize="sm" fontWeight="bold" color="rose.300">
-                            終点：{stationName || "不明"}
+                            終点：{destinationStationName || "不明"}
                           </Text>
                           <Text fontSize="sm" fontWeight="bold" color="rose.300" fontFamily="mono">
                             {terminalStation.departureTime}頃着

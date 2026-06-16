@@ -5,6 +5,9 @@ import { useMessage } from '../../hooks/useMessage';
 import { useSyncTimetable } from "../../hooks/admin/useSyncTimetable";
 import { useSyncBusstops } from "../../hooks/admin/useSyncBusstops";
 import { useSyncBusTimetable } from "../../hooks/admin/useSyncBusTimetable";
+// 💡 作成した京王バス専用のGTFS同期フックをインポート
+import { useSyncKeioTimetables } from "../../hooks/admin/useSyncKeioTimetables";
+import { useSyncNishiTokyoTimetables } from "../../hooks/admin/useSyncNishiTokyoTimetables";
 
 // 🗺️ 都営地下鉄4路線の定義マスタ
 const SUBWAY_LINES = [
@@ -15,11 +18,21 @@ const SUBWAY_LINES = [
   { id: "Arakawa", name: "さくらトラム", color: "pink.500", apiId: "odpt.Railway:Toei.Arakawa" },
 ];
 
-const BUS_OPERATORS = [
+const BUS_POLE_OPERATORS = [
   { id: "Toei", name: "都営バス", color: "green.500", apiId: "odpt.Operator:Toei" },
   { id: "SeibuBus", name: "西武バス", color: "blue.500", apiId: "odpt.Operator:SeibuBus" },
   { id: "TokyuBus", name: "東急バス", color: "gray.500", apiId: "odpt.Operator:TokyuBus" },
-  { id: "SotetsuBus", name: "相鉄バス", color: "orange.500", apiId: "odpt.Operator:SotetsuBus" },];
+  { id: "SotetsuBus", name: "相鉄バス", color: "orange.500", apiId: "odpt.Operator:SotetsuBus" },
+  { id: "keio", name: "京王バス", color: "red.500", apiId: "odpt.Operator:KeioBus" },
+  { id: "nishitokyo", name: "西東京バス", color: "yellow.500", apiId: "odpt.Operator:NishiTokyoBus" }];
+
+const BUS_TIMETABLE_OPERATORS = [
+  { id: "Toei", name: "都営バス", color: "green.500", apiId: "odpt.Operator:Toei" },
+  { id: "SeibuBus", name: "西武バス", color: "blue.500", apiId: "odpt.Operator:SeibuBus" },
+  { id: "SotetsuBus", name: "相鉄バス", color: "orange.500", apiId: "odpt.Operator:SotetsuBus" },
+  { id: "keio", name: "京王バス", color: "red.500", apiId: "odpt.Operator:KeioBus" },
+  { id: "nishitokyo", name: "西東京バス", color: "yellow.500", apiId: "odpt.Operator:NishiTokyoBus" }
+];
 
 export const AdminDashboard: FC = () => {
   // 現在どの路線を同期処理中かを管理するステート（null の時は何も処理していない）
@@ -28,6 +41,13 @@ export const AdminDashboard: FC = () => {
   const { syncTimetable, loading } = useSyncTimetable();
   const { syncBusstops, loading: isSyncingBusstops } = useSyncBusstops();
   const { syncTimetableByRoutes, loading: isSyncingBusTimetable } = useSyncBusTimetable();
+// 💡 京王用の同期処理フックを呼び出す
+  const { syncTimetables: syncKeioTimetables, loading: isSyncingKeioTimetable } = useSyncKeioTimetables();
+// 💡 西東京用の同期処理フックを呼び出す
+  const { syncTimetables: syncNishiTokyoTimetables, loading: isSyncingNishiTokyoTimetable } = useSyncNishiTokyoTimetables();
+
+  // 現在「通常のバス時刻表」または「京王バス時刻表」のどちらかが同期中であるかを判定
+  const isBusTimetableLoading = isSyncingBusTimetable || isSyncingKeioTimetable || isSyncingNishiTokyoTimetable;
 
   const handleSyncTimetable = async (lineId: string, lineName: string) => {
     // ユーザーに確認を促す
@@ -56,7 +76,7 @@ export const AdminDashboard: FC = () => {
 
   const handleSyncBusstop = async (operatorId: string) => {
     // ユーザーに確認を促す
-    const operator = BUS_OPERATORS.find((o) => o.id === operatorId);
+    const operator = BUS_POLE_OPERATORS.find((o) => o.id === operatorId);
     const isConfirmed = window.confirm(`💥 ${operator?.name} の全バス停データを同期します。よろしいですか？`);
     if (!isConfirmed) return;
 
@@ -79,14 +99,56 @@ export const AdminDashboard: FC = () => {
     setActiveLine(null);
   };
 
-  const handleSyncBusTimetable = async (operatorId: string) => {
-    // ユーザーに確認を促す
-    const operator = BUS_OPERATORS.find((o) => o.id === operatorId);
+const handleSyncBusTimetable = async (operatorId: string) => {
+    const operator = BUS_TIMETABLE_OPERATORS.find((o) => o.id === operatorId);
     const isConfirmed = window.confirm(`💥 ${operator?.name} の全バス時刻表データを同期します。よろしいですか？`);
     if (!isConfirmed) return;
 
-    setActiveLine(operatorId); // ローディング対象をセット
+    setActiveLine(operatorId);
 
+    // ==========================================
+    // 🚌 京王バス（GTFS一括処理）の処理分岐
+    // ==========================================
+    if (operatorId === "keio") {
+      const result = await syncKeioTimetables();
+      if (result.success) {
+        showMessage({
+          title: `🎉 京王バス(GTFS)の同期が成功しました！合計 ${result.count} 件の時刻表オブジェクトを更新しました。`,
+          type: 'success'
+        });
+      } else {
+        showMessage({
+          title: `❌ 京王バスの同期に失敗しました: ${result.error}`,
+          type: 'error'
+        });
+      }
+      setActiveLine(null);
+      return;
+    }
+
+    // ==========================================
+    // 🚌 西東京バス（GTFS一括処理）の処理分岐
+    // ==========================================
+    if (operatorId === "nishitokyo") {
+      const result = await syncNishiTokyoTimetables();
+      if (result.success) {
+        showMessage({
+          title: `🎉 西東京バス(GTFS)の同期が成功しました！合計 ${result.count} 件の時刻表オブジェクトを更新しました。`,
+          type: 'success'
+        });
+      } else {
+        showMessage({
+          title: `❌ 西東京バスの同期に失敗しました: ${result.error}`,
+          type: 'error'
+        });
+      }
+      setActiveLine(null);
+      return;
+    }
+
+    // ==========================================
+    // 🚌 通常の事業者（API経由・系統ループ処理）
+    // ==========================================
     let routeIds: string[];
     try {
       routeIds = await fetchAllRouteIds(operatorId);
@@ -101,7 +163,6 @@ export const AdminDashboard: FC = () => {
       return;
     }
 
-    // 同期処理の実行
     const result = await syncTimetableByRoutes(routeIds);
     if (result.success) {
       showMessage({
@@ -140,6 +201,7 @@ export const AdminDashboard: FC = () => {
       </Text>
 
       <Stack gap="6">
+        {/* 📅 鉄道時刻表の管理 */}
         <Box>
           <Card.Root bg="gray.900" borderColor="gray.800" variant="outline">
             <Card.Header>
@@ -196,6 +258,7 @@ export const AdminDashboard: FC = () => {
           </Card.Root>
         </Box>
 
+        {/* 🚏 バス停情報の管理 */}
         <Box mt="6">
           <Card.Root bg="gray.900" borderColor="gray.800" variant="outline">
             <Card.Header>
@@ -211,7 +274,7 @@ export const AdminDashboard: FC = () => {
             </Card.Body>
             {/* 4路線の同期ボタンを2列の綺麗に並んだグリッドで配置 */}
               <SimpleGrid columns={{ base: 1, md: 2 }} gap="4">
-                {BUS_OPERATORS.map((operator) => {
+                {BUS_POLE_OPERATORS.map((operator) => {
                   // このボタンが現在同期中かどうか
                   const isCurrentLoading = isSyncingBusstops && activeLine === operator.id;
                   // 他の路線が同期中かどうか（自分以外のボタンを無効化するため）
@@ -252,6 +315,7 @@ export const AdminDashboard: FC = () => {
           </Card.Root>
         </Box>
 
+        {/* 📅 バス時刻表の管理 */}
         <Box mt="6">
           <Card.Root bg="gray.900" borderColor="gray.800" variant="outline">
             <Card.Header>
@@ -262,16 +326,14 @@ export const AdminDashboard: FC = () => {
             </Card.Header>
             <Card.Body>
               <Text fontSize="sm" color="gray.300" mb="4">
-                都営バス・西武バスなどの公式な「バス時刻表」をodpt APIからフェッチし、Supabaseのデータベースに最新情報を一括保存（UPSERT）します。
+                都営バス・西武バスなどの公式な「バス時刻表」をodpt APIからフェッチ、またはGTFSデータを解析し、Supabaseのデータベースに最新情報を一括保存（UPSERT）します。
               </Text>
             </Card.Body>
-            {/* 4路線の同期ボタンを2列の綺麗に並んだグリッドで配置 */}
               <SimpleGrid columns={{ base: 1, md: 2 }} gap="4">
-                {BUS_OPERATORS.map((operator) => {
-                  // このボタンが現在同期中かどうか
-                  const isCurrentLoading = isSyncingBusTimetable && activeLine === operator.id;
-                  // 他の路線が同期中かどうか（自分以外のボタンを無効化するため）
-                  const isAnyOtherLoading = isSyncingBusTimetable && activeLine !== operator.id;
+                {BUS_TIMETABLE_OPERATORS.map((operator) => {
+                  // 💡 判定用ローディングフラグを統合したものに差し替え
+                  const isCurrentLoading = isBusTimetableLoading && activeLine === operator.id;
+                  const isAnyOtherLoading = isBusTimetableLoading && activeLine !== operator.id;
 
                   return (
                     <Box 

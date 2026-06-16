@@ -3,7 +3,6 @@ import { Page404 } from "../components/pages/Page404";
 import { EnglishInfo } from "../components/pages/EnglishInfo";
 import { BusstopMap } from "../components/pages/BusstopMap";
 import { Test } from "../components/pages/Test";
-import { BusRouteMap } from "../components/pages/BusRouteMap";
 
 export const HomeRoutes = [
   {
@@ -19,9 +18,6 @@ export const HomeRoutes = [
     element: <BusstopMap />,
   },
   {
-    path: "busRoute_map",
-    element: <BusRouteMap />,
-  },  {
     path: "test",
     element: <Test />,
   },

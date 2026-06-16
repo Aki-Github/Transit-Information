@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { Login } from '../components/pages/Login';
 import { HomeRoutes } from './HomeRoutes';
 import { LiveRoutes } from './LiveRoutes';
+import { BusRoutes } from './BusRoutes';
 import { Page404 } from '../components/pages/Page404';
 import { HeaderLayout } from '../components/templates/HeaderLayout';
 import { AdminGuard } from '../components/pages/AdminGuard';
@@ -24,19 +25,29 @@ export const Router: FC = memo(() => {
           />
         ))}
       </Route>
-      {/* 🚇 ライブナビ関連ルート */}
-      <Route path="/live" element={<HeaderLayout />}>
-        {LiveRoutes.map((route) => (
+      {/* 🚇 バスモニター関連ルート */}
+      <Route path="/bus" element={<HeaderLayout />}>
+        {BusRoutes.map((route) => (
           <Route
             key={route.path}
-            // index: true を使うと、親と同じパス("/home")の場合にその要素を出す設定になります
             index={route.path === "/"} 
             path={route.path === "/" ? undefined : route.path}
             element={route.element}
           />
         ))}
       </Route>
-        {/* ⭕ 管理者専用ルート（HeaderLayout の中にネストし、AdminGuardで囲う） */}
+      {/* 🚇 ライブナビ関連ルート */}
+      <Route path="/live" element={<HeaderLayout />}>
+        {LiveRoutes.map((route) => (
+          <Route
+            key={route.path}
+            index={route.path === "/"} 
+            path={route.path === "/" ? undefined : route.path}
+            element={route.element}
+          />
+        ))}
+      </Route>
+      {/* 🚨 管理者専用ルート（HeaderLayout の中にネストし、AdminGuardで囲う） */}
       <Route path="/admin" element={<HeaderLayout />}>
         <Route 
           index // 親のパス（/admin）のときにそのまま表示する設定

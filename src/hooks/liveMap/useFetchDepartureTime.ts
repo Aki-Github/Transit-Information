@@ -9,7 +9,6 @@ interface UseFetchDepartureTimeProps {
 
 export const useFetchDepartureTime = ({ stationId, trainNumber, isOpen }: UseFetchDepartureTimeProps) => {
   const [departureTime, setDepartureTime] = useState<string | null>(null);
-  // ⭕ 駅名を格納する新しいステートを追加
   const [stationName, setStationName] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +75,6 @@ export const useFetchDepartureTime = ({ stationId, trainNumber, isOpen }: UseFet
         }
         
         // 時刻表データのリフレッシュ
-        console.log("Fetched departure time:", timetableResult.data);
         if (timetableResult.data) {
           setDepartureTime(timetableResult.data.departure_time);
         } else {
@@ -84,7 +82,6 @@ export const useFetchDepartureTime = ({ stationId, trainNumber, isOpen }: UseFet
         }
 
         // 駅名データのリフレッシュ
-        console.log("Fetched station name:", stationResult.data);
         if (stationResult.data) {
           setStationName(stationResult.data.name);
         } else if (stationId === 'odpt.Station:Toei.Oedo.Tochomae') {
@@ -107,5 +104,6 @@ export const useFetchDepartureTime = ({ stationId, trainNumber, isOpen }: UseFet
   }, [stationId, trainNumber, isOpen]); // キーや開閉状態が変わったら再取得
 
   // 戻り値に stationName を追加して、コンポーネント側で使えるようにします
+  console.log(`useFetchDepartureTime returns: departureTime=${departureTime}, stationName=${stationName}, loading=${loading}, error=${error}`);
   return { departureTime, stationName, loading, error };
 };

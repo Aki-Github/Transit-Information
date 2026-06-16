@@ -51,8 +51,8 @@ export const MenuDrawer: FC<Props> = memo((props) => {
                 <Button w="100%" variant="ghost" justifyContent="start" onClick={() => onClickNav("/home/english_info")}>
                 English Info
                 </Button>
-                <Button w="100%" variant="ghost" justifyContent="start" onClick={() => onClickNav("/home/busstop_map")}>
-                バス停マップ
+                <Button w="100%" variant="ghost" justifyContent="start" onClick={() => onClickNav("/bus/tokyo")}>
+                🚌 バス停マップ（東京・埼玉）
                 </Button>
                 {/* 地下鉄ナビを2つの路線に分解して配置 */}
                 <Button onClick={() => onClickNav("/live/asakusa")}>🚇 都営浅草線ナビ</Button>

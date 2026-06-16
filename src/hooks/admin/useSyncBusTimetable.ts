@@ -62,12 +62,51 @@ export const useSyncBusTimetable = () => {
         const insertObjects: any[] = [];
 
         rawData.forEach((timetable) => {
+          // 🟢 ここから追加：カレンダーの柔軟な曜日判定ロジック
+          const fullTitle = timetable["dc:title"] || "";
+          const cal = timetable["odpt:calendar"] || "";
+
+          let type: "weekday" | "saturday" | "holiday" = "weekday";
+
+          const lowerCal = cal.toLowerCase();
+          const lowerTitle = fullTitle.toLowerCase();
+
+          // 1. 最も正確な odpt:calendar の文字列パターンで判定（都営バスのMondayToFriday等にも対応）
+          if (lowerCal.endsWith("saturday")) {
+            type = "saturday";
+          } else if (
+            lowerCal.endsWith("sunday") || 
+            lowerCal.endsWith("holiday") || 
+            lowerCal.endsWith("substituteholiday")
+          ) {
+            type = "holiday";
+          } else if (
+            lowerCal.endsWith("weekday") || 
+            lowerCal.endsWith("mondaytofriday")
+          ) {
+            type = "weekday";
+          } 
+          // 2. 万が一判定漏れがあった場合のフォールバック（日本語文字列検索）
+          else if (lowerTitle.includes("土曜")) {
+            type = "saturday";
+          } else if (
+            lowerTitle.includes("休日") || 
+            lowerTitle.includes("日祝") || 
+            lowerTitle.includes("日曜") || 
+            lowerTitle.includes("祝日")
+          ) {
+            type = "holiday";
+          } else {
+            type = "weekday";
+          }
+
           insertHeaders.push({
             owl_sameas: timetable["owl:sameAs"],
             operator: timetable["odpt:operator"],
             busroute: timetable["odpt:busroute"],
             busroute_pattern: timetable["odpt:busroutePattern"] || null,
-            calendar: timetable["odpt:calendar"].split(":").pop() || timetable["odpt:calendar"],
+            // 💡 判定した標準の種別（weekday / saturday / holiday）をそのまま格納！
+            calendar: type,
             title: timetable["dc:title"] || null,
           });
 

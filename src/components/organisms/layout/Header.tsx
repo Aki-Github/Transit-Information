@@ -74,22 +74,14 @@ export const Header: FC = memo(() => {
           </Box>
 
           {/* <Box pr={4}>
-            <RouterLink to="/home/busstop_map" style={{ textDecoration: "none" }}>
+            <RouterLink to="/home/test" style={{ textDecoration: "none" }}>
               <Link as="span" color="inherit" _hover={{ opacity: 0.8 }}>
-                バス停マップ
+                テストページ
               </Link> 
             </RouterLink>
           </Box> */}
 
-          <Box pr={4}>
-            <RouterLink to="/home/busRoute_map" style={{ textDecoration: "none" }}>
-              <Link as="span" color="inherit" _hover={{ opacity: 0.8 }}>
-                バス停マップ
-              </Link> 
-            </RouterLink>
-          </Box>
-
-          {/* 地下鉄運行ナビ */}
+          {/* バスモニターマップ */}
           <Box pr={4}>
             <MenuRoot positioning={{ placement: "bottom-start" }}>
               <MenuTrigger asChild>
@@ -99,7 +91,46 @@ export const Header: FC = memo(() => {
                   _hover={{ opacity: 0.8, cursor: "pointer" }}
                   userSelect="none"
                 >
-                  都営地下鉄運行ナビ ▼
+                  バスモニターマップ ▼
+                </Link>
+              </MenuTrigger>
+
+              <MenuContent bg="gray.800" borderColor="gray.700" color="white" minW="160px">
+                <MenuItem 
+                  value="asakusa" 
+                  color="white"
+                  _hover={{ bg: "gray.600", color: "white" }} 
+                  onClick={() => navigate("/bus/tokyo")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚌 バス停マップ（東京・埼玉）
+                </MenuItem>
+                <MenuItem 
+                  value="mita" 
+                  color="white"
+                  _hover={{ bg: "red.600", color: "white" }} 
+                  onClick={() => navigate("/bus/keio")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚌 京王バス（モニター）
+                </MenuItem>
+              </MenuContent>
+            </MenuRoot>
+          </Box>
+
+          {/* 東京都交通局運行ナビ */}
+          <Box pr={4}>
+            <MenuRoot positioning={{ placement: "bottom-start" }}>
+              <MenuTrigger asChild>
+                <Link 
+                  as="span" 
+                  color="inherit" 
+                  _hover={{ opacity: 0.8, cursor: "pointer" }}
+                  userSelect="none"
+                >
+                  東京都交通局運行ナビ ▼
                 </Link>
               </MenuTrigger>
 

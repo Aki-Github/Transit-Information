@@ -18,6 +18,7 @@ interface BusstopPoleTimetableData {
 interface BusTimetableListProps {
   selectedTimetable: BusstopPoleTimetableData[];
   loadingTimetable: boolean;
+  destination: string; // 追加で行先も受け取る
 }
 
 // 時刻表を「時」ごとに整理するための型定義
@@ -92,7 +93,7 @@ const generateHourlyRows3Col = (validTimetables: BusstopPoleTimetableData[]): Ho
   });
 };
 
-export const BusTimetableList: FC<BusTimetableListProps> = ({ selectedTimetable, loadingTimetable }) => {
+export const BusTimetableList: FC<BusTimetableListProps> = ({ selectedTimetable, loadingTimetable, destination }) => {
   // ★ 3列用時刻表レシピ（proTimetable）を適用
   const recipe = useSlotRecipe({ key: "proTimetable", recipe: professionalTimetableRecipe });
   const styles = recipe();
@@ -126,15 +127,7 @@ export const BusTimetableList: FC<BusTimetableListProps> = ({ selectedTimetable,
   
   // デフォルト値の用意
   let busNumber = "バス";
-  let destination = "指定方向";
 
-  // もしコロンで綺麗に3つ以上に分かれているならそこから抽出（都バスなど）
-//   if (titleParts.length >= 3) {
-//     destination = titleParts[2];
-//   } else {
-//     // コロンが少ない他社データの場合、タイトル文字列そのものを行先として代用、または加工
-//     destination = sampleTitle; 
-//   }
   // 3. コロンの手前（titleParts[0]）にある複雑な運行情報をさらに細かく分解する
   if (titleParts.length > 0) {
     const rawInfo = titleParts[0]; // 例: "渋２４. ＜中略＞ 、渋２４. ＜中略＞ ゆき"
@@ -143,20 +136,25 @@ export const BusTimetableList: FC<BusTimetableListProps> = ({ selectedTimetable,
     if (rawInfo.includes(".")) {
         busNumber = rawInfo.split(".")[0].trim(); // "渋２４" をゲット！
     } else {
-        busNumber = rawInfo.substring(0, 5).trim(); // ピリオドがない場合のセーフティ（先頭数文字）
+        busNumber = ""; // ピリオドがない場合のセーフティ（先頭数文字）
     }
 
     // ★ 行先の抽出：文字列の最後の方にある「◯◯ゆき」という文字を探す
-    const yukiMatch = rawInfo.match(/([^、.\s]+ゆき)\s*$/) || rawInfo.match(/([^、.\s]+ゆき)/);
-    if (yukiMatch) {
-        destination = yukiMatch[1]; // "松が丘交番前ゆき" または "渋谷駅ゆき" をゲット！
-    } else if (titleParts.length >= 3) {
-        // ◯◯ゆき が見つからなかった場合は、従来のコロン区切りの3番目（都バス用）をフォールバックに
-        destination = titleParts[2];
-    } else {
-        destination = sampleTitle;
+    if (destination === "") {
+      const yukiMatch = rawInfo.match(/([^、.\s]+ゆき)\s*$/) || rawInfo.match(/([^、.\s]+ゆき)/);
+      if (yukiMatch) {
+          destination = yukiMatch[1]; // "松が丘交番前ゆき" または "渋谷駅ゆき" をゲット！
+      } else if (titleParts.length >= 3) {
+          // ◯◯ゆき が見つからなかった場合は、従来のコロン区切りの3番目（都バス用）をフォールバックに
+          destination = titleParts[2];
+      } else {
+          destination = "";
+      }
     }
   }
+  console.log("抽出された系統番号:", busNumber);
+  console.log("抽出された行先:", destination);
+
   // 3列の表形式データに組み替える
   const hourlyRows = generateHourlyRows3Col(validTimetables);
 
@@ -175,7 +173,7 @@ export const BusTimetableList: FC<BusTimetableListProps> = ({ selectedTimetable,
           </Text>
         )}
         <Heading size="xs" fontWeight="bold">
-          {destination.includes("ゆき") ? `${destination} 時刻表` : `${destination}ゆき 時刻表`}
+          {(destination === "") ? '時刻表' : `${destination} 時刻表`}
         </Heading>
       </Flex>
 

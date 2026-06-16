@@ -46,9 +46,9 @@ export const useFetchTrainRoute = ({ currentStationId, trainNumber, isOpen }: Us
           ? currentStationId.substring(0, lastDotIndex) 
           : currentStationId;
         
-        // 🕒 現在の時刻を「HH:MM」形式で取得（例: "22:05"）
+        // 🕒 現在の時刻を取得
         const now = new Date();
-        const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        const currentMinutes = now.getHours() * 60 + now.getMinutes(); // 比較用に「今日始まってからの総分数」に変換
 
         // 💡 2. 列車番号 ＋ 【同じ路線のみ】に絞って時刻表を取得
         // ここに .like("station_id", `${stationBasePrefix}.%`) を追加することで、他路線の重複列車を完全に弾きます！
@@ -60,6 +60,8 @@ export const useFetchTrainRoute = ({ currentStationId, trainNumber, isOpen }: Us
           .order("departure_time", { ascending: true });
 
         if (sbError) throw sbError;
+
+        console.log("Fetched route data:", data);
 
         if (!data || data.length === 0) {
           setCurrentStation(null);
@@ -79,18 +81,36 @@ export const useFetchTrainRoute = ({ currentStationId, trainNumber, isOpen }: Us
 
         setFullRoute(formattedRoute);
 
-        // 💡 3. 【超重要修正】「現在時刻以降」で、かつ「指定された駅」に一致するレコードを検索する
-        // 朝・昼・夜と何度も同じ駅を通るデータから、"今走っている時間帯の駅" を正しくピンポイントで探します
-        let currentIndex = formattedRoute.findIndex(
-          (r) => r.stationId.startsWith(stationBasePrefix) && r.departureTime >= currentHHMM         
-        );
+        // 💡 3. 【今回の超重要修正】currentStationId (完全一致) を使い、現在時刻に一番近いインデックスを計算する
+        let currentIndex = -1;
+        let minDiff = Infinity;
 
-        // 💡 フォールバック: 深夜などで現在時刻以降のデータがマッチしない場合は、従来通り最初のマッチを使う
+        formattedRoute.forEach((route, idx) => {
+          // 駅IDが完全に一致するものだけを対象にする（前方一致ではなく完全一致にすることで、別の駅へのズレを防ぐ）
+          if (route.stationId === currentStationId) {
+            // 時刻文字列 "22:31:00" や "22:31" から「総分数」を計算
+            const [hh, mm] = route.departureTime.split(":").map(Number);
+            const routeMinutes = hh * 60 + mm;
+            
+            // 現在時刻との「時間差の絶対値」を計算
+            const diff = Math.abs(routeMinutes - currentMinutes);
+            
+            // 最も現在時刻に近いレコードのインデックスを採用する
+            if (diff < minDiff) {
+              minDiff = diff;
+              currentIndex = idx;
+            }
+          }
+        });
+
+        // 💡 フォールバック: 万が一完全一致で見つからなかった場合の安全弁（前方一致で検索）
         if (currentIndex === -1) {
           currentIndex = formattedRoute.findIndex(
             (r) => r.stationId.startsWith(stationBasePrefix)
           );
         }
+
+        console.log(`[確定インデックス] currentIndex: ${currentIndex} (駅ID: ${currentStationId}, 時間差: ${minDiff}分)`);
 
         if (currentIndex === -1) {
           // 万が一現在の駅が時刻表リストにない場合（他社線直通など）は安全のためリセット
