@@ -74,14 +74,14 @@ export const Header: FC = memo(() => {
           </Box>
 
           {/* <Box pr={4}>
-            <RouterLink to="/home/test" style={{ textDecoration: "none" }}>
+            <RouterLink to="/home/departure_board" style={{ textDecoration: "none" }}>
               <Link as="span" color="inherit" _hover={{ opacity: 0.8 }}>
-                テストページ
+                発車情報
               </Link> 
             </RouterLink>
           </Box> */}
 
-          {/* バスモニターマップ */}
+          {/* バス運行ナビ */}
           <Box pr={4}>
             <MenuRoot positioning={{ placement: "bottom-start" }}>
               <MenuTrigger asChild>
@@ -91,13 +91,13 @@ export const Header: FC = memo(() => {
                   _hover={{ opacity: 0.8, cursor: "pointer" }}
                   userSelect="none"
                 >
-                  バスモニターマップ ▼
+                  バス運行ナビ ▼
                 </Link>
               </MenuTrigger>
 
               <MenuContent bg="gray.800" borderColor="gray.700" color="white" minW="160px">
                 <MenuItem 
-                  value="asakusa" 
+                  value="map_tokyo" 
                   color="white"
                   _hover={{ bg: "gray.600", color: "white" }} 
                   onClick={() => navigate("/bus/tokyo")}
@@ -107,7 +107,47 @@ export const Header: FC = memo(() => {
                   🚌 バス停マップ（東京・埼玉）
                 </MenuItem>
                 <MenuItem 
-                  value="mita" 
+                  value="board_toei" 
+                  color="white"
+                  _hover={{ bg: "green.600", color: "white" }} 
+                  onClick={() => navigate("/bus/board_toei")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚌 発車掲示板（都営バス）
+                </MenuItem>
+                <MenuItem 
+                  value="board_seibu" 
+                  color="white"
+                  _hover={{ bg: "#0bbfe3", color: "white" }} 
+                  onClick={() => navigate("/bus/board_seibu")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚌 発車掲示板（西武バス）
+                </MenuItem>
+                <MenuItem 
+                  value="board_keio" 
+                  color="white"
+                  _hover={{ bg: "#00053a", color: "white" }} 
+                  onClick={() => navigate("/bus/board_keio")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚌 発車掲示板（京王バス）
+                </MenuItem>
+                <MenuItem 
+                  value="board_nishitokyo" 
+                  color="white"
+                  _hover={{ bg: "#EF2127", color: "white" }} 
+                  onClick={() => navigate("/bus/board_nishitokyo")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚌 発車掲示板（西東京バス）
+                </MenuItem>
+                <MenuItem 
+                  value="keio" 
                   color="white"
                   _hover={{ bg: "red.600", color: "white" }} 
                   onClick={() => navigate("/bus/keio")}

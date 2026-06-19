@@ -28,8 +28,13 @@ export const useTrainInformation = () => {
       const response = await fetch(ENDPOINT_ALL);
       const data: TrainInfoData[] = await response.json();
       
-      // 取得した全データをそのままセット
-      setAllTrains(data);
+      // 💡 取得したデータが本当に「配列」かどうかをチェックする
+      if (Array.isArray(data)) {
+        setAllTrains(data);
+      } else {
+        console.warn("APIから配列以外のデータが返却されました:", data);
+        setAllTrains([]); // 配列でない場合は空配列にしてクラッシュを防ぐ
+      }
       
     } catch (error) {
       console.error("データ取得エラー:", error);

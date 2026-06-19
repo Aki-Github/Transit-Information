@@ -541,7 +541,7 @@ export const useActiveTokyoBuses = (busstops: any[]) => {
                   if (correctStopData && correctStopData.index_order !== undefined) {
 
                     // --------------------------------------------------------
-                    // 💡 京王バス用：現在の時間と予定時刻から遅延（分）を算出する
+                    //  西東京バス用：現在の時間と予定時刻から遅延（分）を算出する
                     // --------------------------------------------------------
                     let scheduledTotalMinutes = 0;
                     if (correctStopData.departure_time) {
