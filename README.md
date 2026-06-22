@@ -1,6 +1,6 @@
 # 首都圏運行情報アプリ
 
-Chakra UI v3 と React (TypeScript) を使用して構築した、シンプルでモダンなユーザー管理フロントエンドアプリケーションです。
+Chakra UI v3 と React (TypeScript) を使用して構築した、首都圏交通情報フロントエンドアプリケーションです。
 
 ## 🚀 デモ (オプション)
 - 公開URL: [https://transit-information.vercel.app/]
