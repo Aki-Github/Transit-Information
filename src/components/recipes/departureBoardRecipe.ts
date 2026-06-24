@@ -10,17 +10,20 @@ export const departureBoardRecipe = defineSlotRecipe({
     "platformCardSeibu",
     "platformCardKeio",
     "platformCardNishiTokyo",
+    "platformCardYokohama",
     "loadingOverlay",
     "boardHeader",
     "platformHeaderToei",
     "platformHeaderSeibu",
     "platformHeaderKeio",
     "platformHeaderNishiTokyo",
+    "platformHeaderYokohama",
     "platformTitle",
     "platformBadgeToei",
     "platformBadgeSeibu",
     "platformBadgeKeio",
-    "platformBadgeNishiTokyo"
+    "platformBadgeNishiTokyo",
+    "platformBadgeYokohama",
   ],
   base: {
     // 操作パネル（上部のグレーのボックス）
@@ -85,6 +88,13 @@ export const departureBoardRecipe = defineSlotRecipe({
       overflow: 'hidden',
     },
 
+    platformCardYokohama: {
+      border: '2px solid #007FFF',
+      borderRadius: 'lg',
+      backgroundColor: '#000000',
+      overflow: 'hidden',
+    },
+
     // データを更新中のローディング背景
     loadingOverlay: {
       position: 'absolute' as const, // 💡 ここも「as const」で固定
@@ -142,6 +152,14 @@ export const departureBoardRecipe = defineSlotRecipe({
       alignItems: 'center',
     },
 
+    platformHeaderYokohama: {
+      backgroundColor: '#007FFF',
+      paddingX: '3',
+      paddingY: '1.5',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+
     platformTitle: {
       color: "white",
       fontSize: 'sm',
@@ -168,6 +186,12 @@ export const departureBoardRecipe = defineSlotRecipe({
 
     platformBadgeNishiTokyo: {
       backgroundColor: '#EF2127',
+      color: "white",
+      fontSize: '10px',
+    },
+
+    platformBadgeYokohama: {
+      backgroundColor: '#007FFF',
       color: "white",
       fontSize: '10px',
     },

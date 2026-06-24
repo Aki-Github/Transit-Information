@@ -144,6 +144,7 @@ export const useSyncBusTimetable = () => {
     setLoading(true);
     let totalHeadersCount = 0;
     let totalObjectsCount = 0;
+    let skippedRoutesCount = 0;
 
     try {
       const consumerKey = process.env.REACT_APP_ODPT_KEY;
@@ -151,20 +152,37 @@ export const useSyncBusTimetable = () => {
 
       // 💡 系統ごとにAPIを叩くループ処理
       for (let i = 0; i < busrouteIds.length; i++) {
+        if (i > 0 && i % 80 === 0) {
+          console.log(`⏳ APIの負荷軽減のため、1.5秒間待機します... (${i}件処理完了)`);
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+
         const routeId = busrouteIds[i];
         console.log(`[${i + 1}/${busrouteIds.length}] 系統: ${routeId} を取得中...`);
 
         // 💡 系統（odpt:busroute）で絞り込む（これなら1000件の上限にかかりません）
         const url = `https://api.odpt.org/api/v4/odpt:BusTimetable?odpt:busroutePattern=${routeId}&acl:consumerKey=${consumerKey}`;
 
-        const response = await fetch(url);
-        if (!response.ok) {
-          console.warn(`系統 ${routeId} のデータ取得に失敗したためスキップします。`);
+        // 🟢 対策1: API取得自体でエラーが起きてもキャッチしてスキップできるようにブロック化
+        let rawData: OdptBusTimetable[] = [];
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.warn(`⚠️ APIエラー(ステータス:${response.status}): 系統 ${routeId} をスキップします。`);
+            skippedRoutesCount++;
+            continue;
+          }
+          rawData = await response.json();
+        } catch (fetchErr) {
+          console.error(`❌ ネットワークエラーにより系統 ${routeId} の取得に失敗:`, fetchErr);
+          skippedRoutesCount++;
           continue;
         }
 
-        const rawData: OdptBusTimetable[] = await response.json();
-        if (!rawData || rawData.length === 0) continue;
+        if (!rawData || rawData.length === 0) {
+          console.log(`ℹ️ 系統 ${routeId} の時刻表データは0件でした。`);
+          continue;
+        }
 
         // 💡 この系統のデータをマッピング
         const insertHeaders: any[] = [];
@@ -227,6 +245,31 @@ export const useSyncBusTimetable = () => {
 
             // 💡 系統名（title）は dc:title（例: "荻１１"）をそのままセット
             dbTitle = fullTitle || dbTitle;
+          }  else if (operator === "odpt.Operator:YokohamaMunicipal") {
+            // 🟢 横浜市営バスの場合：終点オブジェクト（配列の最後）の odpt:destinationSign から行先を抽出
+            if (objects.length > 0) {
+              // 💡 配列の一番最後（終点）のオブジェクトを取得
+              const lastObj = objects[objects.length - 1];
+              let rawDestination = lastObj["odpt:destinationSign"] || ""; // 例: "東神奈川駅西口 行"
+
+              if (rawDestination === "") {
+                const firstObj = objects[0];
+                rawDestination = firstObj["odpt:destinationSign"] || "";
+              }
+
+              // 🟢 「 行」を取り除く処理を追加
+              // 1. 末尾の「 行」や「行」を空文字に置き換える
+              // 2. .trim() で前後の余分なスペース（全角・半角）を削る
+              dbDestination = rawDestination.replace(/\s*行$/, "").trim();
+            }
+
+            // 💡 万が一上記で取得できなかった場合の安全なフォールバック
+            if (!dbDestination) {
+              dbDestination = "終点行き";
+            }
+
+            // 💡 系統名（title）は dc:title（例: "038系統"）をそのままセット
+            dbTitle = fullTitle || dbTitle;
           } else {
             // その他のバス会社（デフォルト）
             dbTitle = fullTitle;
@@ -269,37 +312,50 @@ export const useSyncBusTimetable = () => {
           });
         });
 
-        // 💡 1系統取得するごとに、都度Supabaseへ即時UPSERT（メモリ負荷を最小限に）
-        if (insertHeaders.length > 0) {
-          const { error: sbHeaderError } = await supabase
-            .from("bus_timetables")
-            .upsert(insertHeaders, { onConflict: "owl_sameas" });
-          if (sbHeaderError) throw sbHeaderError;
-          totalHeadersCount += insertHeaders.length;
-        }
-
-        if (insertObjects.length > 0) {
-          // 子レコードは量が多い場合があるため2000件ずつに丸める
-          const objectChunkSize = 2000;
-          for (let k = 0; k < insertObjects.length; k += objectChunkSize) {
-            const chunk = insertObjects.slice(k, k + objectChunkSize);
-            const { error: sbObjectError } = await supabase
-              .from("bus_timetable_objects")
-              .upsert(chunk, { onConflict: "timetable_owl_sameas,index_order" });
-            if (sbObjectError) throw sbObjectError;
-            totalObjectsCount += chunk.length;
+        // 🟢 対策2: Supabaseへのデータ流し込みを安全なトライキャッチで保護
+        try {
+          // 親レコードの保存
+          if (insertHeaders.length > 0) {
+            const { error: sbHeaderError } = await supabase
+              .from("bus_timetables")
+              .upsert(insertHeaders, { onConflict: "owl_sameas" });
+            if (sbHeaderError) throw sbHeaderError;
+            totalHeadersCount += insertHeaders.length;
           }
+
+          // 子レコードの保存 (チャンクサイズを500に縮小＋ウェイトを導入)
+          if (insertObjects.length > 0) {
+            const objectChunkSize = 500; // 💡 1000から500に下げてリクエストを軽量化
+            for (let k = 0; k < insertObjects.length; k += objectChunkSize) {
+              const chunk = insertObjects.slice(k, k + objectChunkSize);
+              const { error: sbObjectError } = await supabase
+                .from("bus_timetable_objects")
+                .upsert(chunk, { onConflict: "timetable_owl_sameas,index_order" });
+              
+              if (sbObjectError) throw sbObjectError;
+              totalObjectsCount += chunk.length;
+
+              // 💡 対策3: 1チャンク送るごとに50ms休止。Supabase側のバースト（過負荷）を防ぐ
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+          }
+        } catch (dbErr) {
+          // 💡 ここでキャッチすることで、この系統がエラーになっても全体は止まらず次の系統の処理に進める！
+          console.error(`❌ Supabaseへの書き込み失敗 (系統: ${routeId}):`, dbErr);
+          skippedRoutesCount++;
         }
 
-        // APIのレートリミット（負荷）対策として、1回ごとに20msほど少しだけ待機
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        // 系統間のインターバルを少し長め（100ms）にしてAPI・DB双方を労わる
+        await new Promise((resolve) => setTimeout(resolve, 200)); // 100ms から 200ms に微増
       }
 
-      console.log(`同期完了: 親テーブル ${totalHeadersCount}件, 子テーブル ${totalObjectsCount}件 を反映しました。`);
-      return { success: true, processedRoutes: busrouteIds.length };
+      console.log(`🎉 全系統の同期処理が終了しました。`);
+      console.log(`   成功: 親 ${totalHeadersCount}件 / 子 ${totalObjectsCount}件`);
+      console.log(`   スキップ・エラー: ${skippedRoutesCount} 系統`);
+      return { success: true, processedRoutes: busrouteIds.length - skippedRoutesCount };
 
     } catch (err: any) {
-      console.error("時刻表同期中にエラーが発生しました:", err);
+      console.error("予期せぬ致命的エラー:", err);
       return { success: false, processedRoutes: 0, error: err.message || "同期エラー" };
     } finally {
       setLoading(false);

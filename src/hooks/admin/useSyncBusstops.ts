@@ -77,7 +77,7 @@ export const useSyncBusstops = () => {
         });
 
       } else if (operatorId.toLowerCase() === "nishitokyo") {
-        // 西東京バスも同様のGTFS処理を行う場合は、上記の京王バスの処理をコピーしてURLやプレフィックスを変更してください
+        // 西東京バス
         const gtfsUrl = `https://api.odpt.org/api/v4/files/odpt/NishiTokyoBus/NTBus.zip?date=20260622&acl:consumerKey=${consumerKey}`;
 
         // 1. ZIPファイルをバイナリとしてフェッチ
@@ -114,6 +114,48 @@ export const useSyncBusstops = () => {
             updated_at: new Date().toISOString(),
           };
         });
+
+      } else if (operatorId.toLowerCase() === "kawasakicity") {
+        // 川崎市営バス
+        const gtfsUrl = `https://api.odpt.org/api/v4/files/odpt/TransportationBureau_CityOfKawasaki/AllLines.zip?date=20260528&acl:consumerKey=${consumerKey}`;
+
+        // 1. ZIPファイルをバイナリとしてフェッチ
+        const response = await fetch(gtfsUrl);
+        if (!response.ok) throw new Error("川崎市営バスのGTFSデータの取得に失敗しました。");
+        const arrayBuffer = await response.arrayBuffer();
+
+        // 2. JSZipで解凍し、stops.txt を抽出
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const stopsFile = zip.file("stops.txt");
+        if (!stopsFile) throw new Error("GTFSの中に stops.txt が見つかりませんでした。");
+        
+        const stopsText = await stopsFile.async("string");
+
+        // 3. PapaParseでCSVをJSONオブジェクトの配列に変換
+        const parsed = Papa.parse<GtfsStopRow>(stopsText, {
+          header: true,
+          skipEmptyLines: true,
+        });
+
+        // 4. Supabaseのテーブル構造に合わせてマッピング
+        insertRows = parsed.data
+          .filter((stop) => stop.stop_id.includes("_"))
+          .map((stop) => {
+            const globalId = `kawasakicity:BusstopPole:${stop.stop_id}`;
+            const pole_number = stop.stop_id.split("_").pop() || null;
+
+            return {
+              id: globalId,
+              owl_sameas: globalId,
+              title: stop.stop_name || "名称不明",
+              busstop_pole_number: pole_number,
+              platform_number: pole_number,
+              operator: "odpt.Operator:KawasakiCity",
+              lat: stop.stop_lat ? parseFloat(stop.stop_lat) : null,
+              long: stop.stop_lon ? parseFloat(stop.stop_lon) : null,
+              updated_at: new Date().toISOString(),
+            };
+          });
 
       // ==========================================
       // 🚌 パターンB: 通常の事業者 (従来通りのWeb API処理)

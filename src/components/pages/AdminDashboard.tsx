@@ -1,5 +1,5 @@
 import { FC, useState } from "react";
-import { Box, Heading, Text, Button, Stack, Card, Badge, Flex, SimpleGrid } from "@chakra-ui/react";
+import { Box, chakra, Heading, Text, Button, Stack, Card, Badge, Flex, SimpleGrid, Input } from "@chakra-ui/react";
 
 import { useMessage } from '../../hooks/useMessage';
 import { useSyncTimetable } from "../../hooks/admin/useSyncTimetable";
@@ -8,6 +8,8 @@ import { useSyncBusTimetable } from "../../hooks/admin/useSyncBusTimetable";
 // 💡 作成した京王バス専用のGTFS同期フックをインポート
 import { useSyncKeioTimetables } from "../../hooks/admin/useSyncKeioTimetables";
 import { useSyncNishiTokyoTimetables } from "../../hooks/admin/useSyncNishiTokyoTimetables";
+import { useSyncKawasakiCityTimetables } from "../../hooks/admin/useSyncKawasakiCityTimetables";
+import { useSyncBusroutePattern } from "../../hooks/admin/useSyncBusroutePattern";
 
 // 🗺️ 都営地下鉄4路線の定義マスタ
 const SUBWAY_LINES = [
@@ -20,19 +22,30 @@ const SUBWAY_LINES = [
 
 const BUS_POLE_OPERATORS = [
   { id: "Toei", name: "都営バス", color: "green.500", apiId: "odpt.Operator:Toei" },
-  { id: "SeibuBus", name: "西武バス", color: "blue.500", apiId: "odpt.Operator:SeibuBus" },
+  { id: "SeibuBus", name: "西武バス", color: "#0bbfe3", apiId: "odpt.Operator:SeibuBus" },
   { id: "TokyuBus", name: "東急バス", color: "gray.500", apiId: "odpt.Operator:TokyuBus" },
   { id: "SotetsuBus", name: "相鉄バス", color: "orange.500", apiId: "odpt.Operator:SotetsuBus" },
-  { id: "keio", name: "京王バス", color: "red.500", apiId: "odpt.Operator:KeioBus" },
-  { id: "nishitokyo", name: "西東京バス", color: "yellow.500", apiId: "odpt.Operator:NishiTokyoBus" }];
+  { id: "keio", name: "京王バス", color: "#00053a", apiId: "odpt.Operator:KeioBus" },
+  { id: "nishitokyo", name: "西東京バス", color: "#EF2127", apiId: "odpt.Operator:NishiTokyoBus" },
+  { id: "YokohamaMunicipal", name: "横浜市営バス", color: "#007FFF", apiId: "odpt.Operator:YokohamaMunicipal" },
+  { id: "kawasakicity", name: "川崎市営バス", color: "#00BFFF", apiId: "odpt.Operator:KawasakiCity" },
+];
 
 const BUS_TIMETABLE_OPERATORS = [
   { id: "Toei", name: "都営バス", color: "green.500", apiId: "odpt.Operator:Toei" },
-  { id: "SeibuBus", name: "西武バス", color: "blue.500", apiId: "odpt.Operator:SeibuBus" },
+  { id: "SeibuBus", name: "西武バス", color: "#0bbfe3", apiId: "odpt.Operator:SeibuBus" },
   { id: "SotetsuBus", name: "相鉄バス", color: "orange.500", apiId: "odpt.Operator:SotetsuBus" },
-  { id: "keio", name: "京王バス", color: "red.500", apiId: "odpt.Operator:KeioBus" },
-  { id: "nishitokyo", name: "西東京バス", color: "yellow.500", apiId: "odpt.Operator:NishiTokyoBus" }
+  { id: "keio", name: "京王バス", color: "#00053a", apiId: "odpt.Operator:KeioBus" },
+  { id: "nishitokyo", name: "西東京バス", color: "#EF2127", apiId: "odpt.Operator:NishiTokyoBus" },
+  { id: "YokohamaMunicipal", name: "横浜市営バス", color: "#007FFF", apiId: "odpt.Operator:YokohamaMunicipal" },
+  { id: "kawasakicity", name: "川崎市営バス", color: "#00BFFF", apiId: "odpt.Operator:KawasakiCity" },
+  { id: "Other", name: "手入力", color: "black.500", apiId: "odpt.Operator:Other" },
 ];
+
+const BUS_ROUTE_OPERATORS = [
+  { id: "Toei", name: "都営バス", color: "green.500", apiId: "odpt.Operator:Toei" },
+  { id: "SeibuBus", name: "西武バス", color: "#0bbfe3", apiId: "odpt.Operator:SeibuBus" },
+]
 
 export const AdminDashboard: FC = () => {
   // 現在どの路線を同期処理中かを管理するステート（null の時は何も処理していない）
@@ -41,13 +54,19 @@ export const AdminDashboard: FC = () => {
   const { syncTimetable, loading } = useSyncTimetable();
   const { syncBusstops, loading: isSyncingBusstops } = useSyncBusstops();
   const { syncTimetableByRoutes, loading: isSyncingBusTimetable } = useSyncBusTimetable();
-// 💡 京王用の同期処理フックを呼び出す
+  const { syncPatternsByOperator, loading: isSyncingBusroutePattern } = useSyncBusroutePattern();
+  // 京王用の同期処理フックを呼び出す
   const { syncTimetables: syncKeioTimetables, loading: isSyncingKeioTimetable } = useSyncKeioTimetables();
-// 💡 西東京用の同期処理フックを呼び出す
+  // 西東京用の同期処理フックを呼び出す
   const { syncTimetables: syncNishiTokyoTimetables, loading: isSyncingNishiTokyoTimetable } = useSyncNishiTokyoTimetables();
+  // 川崎市営用の同期処理フックを呼び出す
+  const { syncTimetables: syncKawasakiCityTimetables, loading: isSyncingKawasakiCityTimetable } = useSyncKawasakiCityTimetables();
+
+  // 🟢 手入力用のステートを追加
+  const [customRouteId, setCustomRouteId] = useState<string>("");
 
   // 現在「通常のバス時刻表」または「京王バス時刻表」のどちらかが同期中であるかを判定
-  const isBusTimetableLoading = isSyncingBusTimetable || isSyncingKeioTimetable || isSyncingNishiTokyoTimetable;
+  const isBusTimetableLoading = isSyncingBusTimetable || isSyncingKeioTimetable || isSyncingNishiTokyoTimetable || isSyncingKawasakiCityTimetable;
 
   const handleSyncTimetable = async (lineId: string, lineName: string) => {
     // ユーザーに確認を促す
@@ -147,6 +166,63 @@ const handleSyncBusTimetable = async (operatorId: string) => {
     }
 
     // ==========================================
+    // 🚌 川崎市営バス（GTFS一括処理）の処理分岐
+    // ==========================================
+    if (operatorId === "kawasakicity") {
+      const result = await syncKawasakiCityTimetables();
+      if (result.success) {
+        showMessage({
+          title: `🎉 川崎市営バス(GTFS)の同期が成功しました！合計 ${result.count} 件の時刻表オブジェクトを更新しました。`,
+          type: 'success'
+        });
+      } else {
+        showMessage({
+          title: `❌ 川崎市営バスの同期に失敗しました: ${result.error}`,
+          type: 'error'
+        });
+      }
+      setActiveLine(null);
+      return;
+    }
+
+    // ==========================================
+    // 🚌 手入力（BusroutePattern）
+    // ==========================================    
+    if (operatorId === "Other") {
+      // 🟢 トリムして空白を除去し、未入力チェックをかける
+      const targetRoute = customRouteId.trim();
+      if (!targetRoute) {
+        showMessage({
+          title: "❌ 系統ID（BusroutePattern）を入力してください。",
+          type: "error",
+        });
+        setActiveLine(null);
+        return;
+      }
+
+      // 🟢 配列にテキストボックスの値を格納
+      let routeIds: string[] = [targetRoute];
+
+      console.log(`手入力同期を開始: ${targetRoute}`);
+      const result = await syncTimetableByRoutes(routeIds);
+
+      if (result.success) {
+        showMessage({
+            title: `🎉 同期が成功しました！合計 ${result.processedRoutes} 件のバス時刻表を更新しました。`,
+            type: 'success'
+          });
+      } else {
+        showMessage({
+            title: `❌ 同期に失敗しました`,
+            type: 'error'
+          });
+      }
+
+      setActiveLine(null);
+      return;
+    }
+
+    // ==========================================
     // 🚌 通常の事業者（API経由・系統ループ処理）
     // ==========================================
     let routeIds: string[];
@@ -167,6 +243,31 @@ const handleSyncBusTimetable = async (operatorId: string) => {
     if (result.success) {
       showMessage({
           title: `🎉 同期が成功しました！合計 ${result.processedRoutes} 件のバス時刻表を更新しました。`,
+          type: 'success'
+        });
+    } else {
+      showMessage({
+          title: `❌ 同期に失敗しました`,
+          type: 'error'
+        });
+    }
+
+    setActiveLine(null);
+  };
+
+  const handleSyncBusroute = async (operatorId: string) => {
+    // ユーザーに確認を促す
+    const operator = BUS_POLE_OPERATORS.find((o) => o.id === operatorId);
+    const isConfirmed = window.confirm(`💥 ${operator?.name} の全バス路線情報データを同期します。よろしいですか？`);
+    if (!isConfirmed) return;
+
+    setActiveLine(operatorId); // ローディング対象をセット
+
+    // 同期処理の実行
+    const result = await syncPatternsByOperator(operatorId);
+    if (result.success) {
+      showMessage({
+          title: `🎉 同期が成功しました！合計 ${result.totalPatterns} 件のバス停を更新しました。`,
           type: 'success'
         });
     } else {
@@ -360,6 +461,84 @@ const handleSyncBusTimetable = async (operatorId: string) => {
                         loading={isCurrentLoading}
                         disabled={isAnyOtherLoading}
                         onClick={() => handleSyncBusTimetable(operator.id)}
+                      >
+                        🔄 {operator.name}データを同期
+                      </Button>
+                    </Box>
+                  );
+                })}
+              </SimpleGrid>
+          </Card.Root>
+        </Box>
+
+        {/* ✍️ 手入力用フォームセクション（Chakra v3対応版） */}
+        <Box p={5} shadow="md" borderWidth="1px" borderRadius="md" bg="white">
+          <Heading as="h2" size="md" mb={4}>
+            ✍️ 特定の系統を狙って同期
+          </Heading>
+          
+          {/* 💡 エラーの原因だったFormControl等を撤去し、標準タグとBox/Textの組み合わせに安全化 */}
+          <Box as="div">
+            <chakra.label htmlFor="custom-route-id" display="block" fontSize="sm" color="gray.600" mb={2} fontWeight="medium">
+              系統ID (odpt:busroutePattern) の owl:sameAs
+            </chakra.label>
+            <Input
+              id="custom-route-id"
+              placeholder="例: odpt.BusroutePattern:SeibuBus.Furu01.454001.2"
+              value={customRouteId}
+              onChange={(e) => setCustomRouteId(e.target.value)}
+              bg="gray.50"
+              color="black"
+              disabled={loading}
+            />
+          </Box>
+        </Box>
+
+        {/* 📅 バス路線情報の管理 */}
+        <Box mt="6">
+          <Card.Root bg="gray.900" borderColor="gray.800" variant="outline">
+            <Card.Header>
+              <Flex justify="space-between" align="center">
+                <Heading size="md" color="teal.300">📅 バス路線情報の管理</Heading>
+                <Badge colorPalette="teal">Bus_RoutePattern</Badge>
+              </Flex>
+            </Card.Header>
+            <Card.Body>
+              <Text fontSize="sm" color="gray.300" mb="4">
+                都営バス・西武バスなどの公式な「バス路線情報」をodpt APIからフェッチ、またはGTFSデータを解析し、Supabaseのデータベースに最新情報を一括保存（UPSERT）します。
+              </Text>
+            </Card.Body>
+              <SimpleGrid columns={{ base: 1, md: 2 }} gap="4">
+                {BUS_ROUTE_OPERATORS.map((operator) => {
+                  // 💡 判定用ローディングフラグを統合したものに差し替え
+                  const isCurrentLoading = isSyncingBusroutePattern && activeLine === operator.id;
+                  const isAnyOtherLoading = isSyncingBusroutePattern && activeLine !== operator.id;
+
+                  return (
+                    <Box 
+                      key={operator.id} 
+                      p="4" 
+                      bg="gray.950" 
+                      borderRadius="md" 
+                      border="1px solid" 
+                      borderColor="gray.800"
+                    >
+                      <Flex justify="space-between" align="center" mb="3">
+                        <Flex align="center" gap="2">
+                          <Box w="3" h="3" borderRadius="full" bg={operator.color} />
+                          <Text fontWeight="bold" fontSize="sm">{operator.name}</Text>
+                        </Flex>
+                        <Text fontSize="10px" color="gray.500" fontFamily="mono">{operator.id}</Text>
+                      </Flex>
+                      
+                      <Button 
+                        w="full"
+                        colorPalette="teal" 
+                        variant="outline"
+                        size="sm"
+                        loading={isCurrentLoading}
+                        disabled={isAnyOtherLoading}
+                        onClick={() => handleSyncBusroute(operator.id)}
                       >
                         🔄 {operator.name}データを同期
                       </Button>

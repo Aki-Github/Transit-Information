@@ -56,7 +56,7 @@ export const useBusPoleTimeTable = (
   const fetchTerminalTimetables = async (latitude: number, longitude: number) => {
     let t_operator = operator;
 
-    if (operator === 'odpt.Operator:Toei' || operator === 'odpt.Operator:SeibuBus' ) {
+    if (operator === 'odpt.Operator:Toei' || operator === 'odpt.Operator:SeibuBus' || operator === 'odpt.Operator:YokohamaMunicipal' ) {
       t_operator = `["${operator}"]`;
     }
 
@@ -92,6 +92,7 @@ export const useBusPoleTimeTable = (
       .select(`
         departure_time,
         busstop_pole_owl_sameas,
+        timetable_owl_sameas,
         bus_timetables (
           calendar,
           busroute,
@@ -163,14 +164,18 @@ export const useBusPoleTimeTable = (
             // 💡 vehicle 直下の stopId が「向かっている停留所」を表します
             let toBusstopPole = "";
             let busroute = "";
+            let busTimetable = "";
+
             if (vehicle.stopId) {
               // システム側の owl_sameas (例: "odpt.BusstopPole:KeioBus.1409_01") の形式に整形
               if (operator === "odpt.Operator:KeioBus") {
                 toBusstopPole = `keio:BusstopPole:${vehicle.stopId}`;
                 busroute = `keio:BusroutePattern:${timetableId}`;
+                busTimetable = `keio:Timetable:${timetableId}`;
               } else {
                 toBusstopPole = `nishitokyo:BusstopPole:${vehicle.stopId}`;
                 busroute = `nishitokyo:BusroutePattern:${timetableId}`;
+                busTimetable = `nishitokyo:Timetable:${timetableId}`;
               }
             }
 
@@ -178,7 +183,7 @@ export const useBusPoleTimeTable = (
               convertedBuses.push({
                 // routeId が無ければ timetableId でフォールバック（前方一致などのマッチング用）
                 "odpt:busroute": busroute, 
-                "odpt:busTimetable": timetableId,
+                "odpt:busTimetable": busTimetable,
                 "odpt:toBusstopPole": toBusstopPole,
                 "odpt:delay": 0 // VehiclePositionからは遅延が取れないため一律0（接近判定メイン）
               });
@@ -226,7 +231,7 @@ export const useBusPoleTimeTable = (
       if (rawTitle) {
         // 💡 ドット "." で文字列を配列に分割します
         let parts = [];
-        if (operator === 'odpt.Operator:Toei' || operator === 'odpt.Operator:SeibuBus' ) {
+        if (operator === 'odpt.Operator:Toei' || operator === 'odpt.Operator:SeibuBus' || operator === 'odpt.Operator:YokohamaMunicipal') {
           parts = rawTitle.split('.');
         }
         else {
@@ -250,16 +255,16 @@ export const useBusPoleTimeTable = (
       }
 
       const platformKey = `${poleName} ${platformName}`;
-      // const platformKey = matchedPole ? matchedPole.busstop_pole_number : "0";
 
       // 時刻表ベースの基本残り時間
       const [hh, mm] = item.departure_time.split(':').map(Number);
-      const diffMin = (hh * 60 + mm) - (now.getHours() * 60 + now.getMinutes());
+      const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+      const scheduledTotalMinutes = hh * 60 + mm;
+      const diffMin = scheduledTotalMinutes - currentTotalMinutes;
       
       // -------------------------------------------------------------------------
       // 5. 時刻表データ（item）とリアルタイムデータ（realtimeBuses）のマッチング
       // -------------------------------------------------------------------------
-      // 親の時刻表 owl_sameas と、odpt:busTimetable（または系統とターゲットポール）で一致する現在走っているバスを探す
       let liveBus;
       if (operator === "odpt.Operator:KeioBus" || operator === "odpt.Operator:NishiTokyoBus") {
         liveBus = realtimeBuses.find(bus => 
@@ -276,18 +281,40 @@ export const useBusPoleTimeTable = (
       let isApproaching = false;
 
       if (liveBus) {
-        // A. 遅延情報の解析 (秒単位を分単位に直す。60秒以上なら遅延扱い)
-        const delaySeconds = liveBus["odpt:delay"] || 0;
-        const delayMinutes = Math.floor(delaySeconds / 60);
+        // 🟢 拡張：遅延時間（分）の算出ロジック
+        let delayMinutes = 0;
+
+        if (liveBus["odpt:delay"] !== undefined && liveBus["odpt:delay"] > 0) {
+          // APIから直接odpt:delay(秒)が取得できる場合（都営など）
+          delayMinutes = Math.floor(liveBus["odpt:delay"] / 60);
+        } else {
+          // 💡 西武バスなど、APIからdelayが取れない場合の計算ロジック
+          // (現在時刻 - 予定時刻) で遅延している差分を割り出す
+          const diffMinutes = currentTotalMinutes - scheduledTotalMinutes;
+          // プラス（現在時刻の方が過ぎている）の場合のみ、遅延として採用
+          delayMinutes = Math.max(0, diffMinutes);
+        }
 
         // B. 接近情報の解析
         // このバスの「次の停留所（toBusstopPole）」が、今まさにこの電光掲示板のターゲットポールである場合
-        if (liveBus["odpt:toBusstopPole"] === item.busstop_pole_owl_sameas) {
+        let timetableOwlSameas = "";
+        if (operator === "odpt.Operator:KeioBus" || operator === "odpt.Operator:NishiTokyoBus") {
+          timetableOwlSameas = item.timetable_owl_sameas.replace(/:[^:]+$/, "");
+        } else {
+          timetableOwlSameas = item.timetable_owl_sameas;
+        }
+
+        if (liveBus["odpt:toBusstopPole"] === item.busstop_pole_owl_sameas 
+            && liveBus["odpt:busTimetable"] === timetableOwlSameas
+          ) {
           status = "まもなく来ます";
           isApproaching = true;
+
+          // 💡 「まもなく来ます」の状態でも、遅延があれば掲示板へ「接近中 (○分遅れ)」を出す
           if (delayMinutes > 0) {
             status = `接近中 (${delayMinutes}分遅れ)`;
           }
+          console.log(liveBus);
         } else {
           // ターゲットの手前にいる場合
           if (delayMinutes > 0) {
@@ -296,7 +323,7 @@ export const useBusPoleTimeTable = (
             status = `あと ${diffMin} 分`;
           }
         }
-        console.log(`リアルタイム情報で更新: ${parent.title} → ${status}`);
+        console.log(`リアルタイム情報で更新: ${parent.title} → ${status} (算出遅延: ${delayMinutes}分)`);
       } else {
         // リアルタイム情報がまだない/取得できなかった場合のフォールバック（従来のロジック）
         if (diffMin <= 3) {

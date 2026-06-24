@@ -5,7 +5,7 @@ import { Box, Flex, Input, Button, Text, useSlotRecipe, Heading, Separator, Badg
 import L from 'leaflet';
 
 import { useStationSearch } from '../../../hooks/bus/useStationSearch';
-import { useActiveTokyoBuses } from '../../../hooks/bus/useActiveTokyoBuses';
+import { useActiveKanagawaBuses } from '../../../hooks/bus/useActiveKanagawaBuses';
 import { searchHeaderRecipe } from '../../recipes/searchHeaderRecipe';
 import { busMapPopupRecipe } from '../../recipes/busMapPopupRecipe';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -83,7 +83,7 @@ const MapController: FC<MapControllerProps> = ({ onSearchCurrentCenter, loading 
   );
 };
 
-export const BusStopTokyoMap: FC = memo(() => {
+export const BusStopKanagawaMap: FC = memo(() => {
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const { 
@@ -97,9 +97,9 @@ export const BusStopTokyoMap: FC = memo(() => {
     searchStationAndBusstops,
     searchByCoordinates, // 💡 フックに追加した関数を展開
     fetchTimetable 
-  } = useStationSearch([35.6812, 139.7671]);
+  } = useStationSearch([35.466195, 139.622704]);
 
-  const { activeBuses } = useActiveTokyoBuses(busstops);
+  const { activeBuses } = useActiveKanagawaBuses(busstops);
 
   const handleSearch = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -122,7 +122,7 @@ export const BusStopTokyoMap: FC = memo(() => {
           <Flex {...headerStyles.form}>
             <Input
               type="text"
-              placeholder="駅名もしくは地名を入力（例：東京、新宿、麻生）"
+              placeholder="駅名もしくは地名を入力（例：横浜、川崎、都築）"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               {...headerStyles.input}
@@ -134,7 +134,7 @@ export const BusStopTokyoMap: FC = memo(() => {
         </form>
         {errorMessage && <Text {...headerStyles.errorText}>{errorMessage}</Text>}
         <Flex justify="space-between" align="center" mt="1">
-          <Text {...headerStyles.countText}>周辺のバス停件数: {busstops.length} 件 （対応事業者：都営バス、西武バス、京王バス、東急バス）</Text>
+          <Text {...headerStyles.countText}>周辺のバス停件数: {busstops.length} 件 （対応事業者：横浜市営バス、川崎市営バス）</Text>
           {/* 💡 走行中台数のバッジ表示（あるとリッチに見えます） */}
           {activeBuses.length > 0 && (
             <Text fontSize="xs" color="blue.600" fontWeight="bold">

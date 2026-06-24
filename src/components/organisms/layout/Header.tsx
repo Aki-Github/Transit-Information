@@ -107,6 +107,15 @@ export const Header: FC = memo(() => {
                   🚌 バス停マップ（東京・埼玉）
                 </MenuItem>
                 <MenuItem 
+                  value="map_kanagawa" 
+                  color="white"
+                  _hover={{ bg: "gray.600", color: "white" }} 
+                  onClick={() => navigate("/bus/kanagawa")}
+                  cursor="pointer"
+                  py="2"
+                >
+                  🚌 バス停マップ（神奈川）
+                </MenuItem>                <MenuItem 
                   value="board_toei" 
                   color="white"
                   _hover={{ bg: "green.600", color: "white" }} 
@@ -147,14 +156,14 @@ export const Header: FC = memo(() => {
                   🚌 発車掲示板（西東京バス）
                 </MenuItem>
                 <MenuItem 
-                  value="keio" 
+                  value="board_yokohama" 
                   color="white"
-                  _hover={{ bg: "red.600", color: "white" }} 
-                  onClick={() => navigate("/bus/keio")}
+                  _hover={{ bg: "#007FFF", color: "white" }} 
+                  onClick={() => navigate("/bus/board_yokohama")}
                   cursor="pointer"
                   py="2"
                 >
-                  🚌 京王バス（モニター）
+                  🚌 発車掲示板（横浜市営バス）
                 </MenuItem>
               </MenuContent>
             </MenuRoot>

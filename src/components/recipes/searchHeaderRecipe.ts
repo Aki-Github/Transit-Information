@@ -3,7 +3,7 @@ import { defineSlotRecipe } from "@chakra-ui/react";
 // 検索ヘッダー専用のマルチパートレシピを定義
 const searchHeaderConfig = defineSlotRecipe({
   className: "search-header",
-  slots: ["container", "form", "input", "button", "errorText", "countText"],
+  slots: ["container", "form", "input", "button", "errorText", "countText", "mapButtonContainer", "mapButton"],
   base: {
     container: {
       padding: "15px",
@@ -56,6 +56,21 @@ const searchHeaderConfig = defineSlotRecipe({
       fontSize: "12px",
       color: "#666",
     },
+    // 💡 移動してきたスタイル群
+    mapButtonContainer: {
+      position: "absolute",
+      top: "20px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: "1000",
+    },
+    mapButton: {
+      borderRadius: "full",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      fontWeight: "bold",
+      px: "6",
+      cursor: "pointer",
+    }
   },
 });
 
